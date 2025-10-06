@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.database.session import SessionLocal
 from app.main import app
-from app.models import SleepSession, User
+from app.models import Goal, SleepSession, User
 
 
 @pytest.fixture
@@ -25,6 +25,7 @@ def test_user(db_session):
     yield user
 
     db_session.query(SleepSession).filter(SleepSession.user_id == user.id).delete()
+    db_session.query(Goal).filter(Goal.user_id == user.id).delete()
     db_session.delete(user)
     db_session.commit()
 
