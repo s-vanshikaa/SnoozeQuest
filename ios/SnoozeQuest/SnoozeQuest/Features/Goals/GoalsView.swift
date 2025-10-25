@@ -6,7 +6,11 @@
 import SwiftUI
 
 struct GoalsView: View {
-    @StateObject private var viewModel = GoalsViewModel()
+    @StateObject private var viewModel = GoalsViewModel(
+        goalRepository: AppEnvironment.goalRepository,
+        sleepRepository: AppEnvironment.sleepRepository,
+        analyticsRepository: AppEnvironment.analyticsRepository
+    )
 
     var body: some View {
         NavigationStack {
