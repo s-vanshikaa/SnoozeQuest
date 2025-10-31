@@ -20,6 +20,7 @@
 		A29D35143E2F16D31E7F9195 /* RemoteSleepRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F93A17448B435B16CF0C2400 /* RemoteSleepRepositoryTests.swift */; };
 		78698D5BE7219CAEEBC26BC1 /* RemoteAnalyticsRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1212DA76851790E8BEF8BDFB /* RemoteAnalyticsRepositoryTests.swift */; };
 		5364394ADE624D15E564699D /* RemoteLeaderboardRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D9B63971F10A21D36CB8F86 /* RemoteLeaderboardRepositoryTests.swift */; };
+		E1B2A3C4D5E6F708192A3B4C /* SwiftDataSleepSessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1B2A3C4D5E6F708192A3B4D /* SwiftDataSleepSessionStoreTests.swift */; };
 		A518F8F9A0F574458D8FB374 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB67A9B001FBE62E082C7C3B /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
@@ -48,6 +49,7 @@
 		F9BE64F2A4D83252B7386C6C /* SleepScoreCalculatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SleepScoreCalculatorTests.swift; sourceTree = "<group>"; };
 		3DA826F40E33AD9CFF93F25C /* RemoteGoalRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteGoalRepositoryTests.swift; sourceTree = "<group>"; };
 		F93A17448B435B16CF0C2400 /* RemoteSleepRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteSleepRepositoryTests.swift; sourceTree = "<group>"; };
+		E1B2A3C4D5E6F708192A3B4D /* SwiftDataSleepSessionStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SwiftDataSleepSessionStoreTests.swift; sourceTree = "<group>"; };
 		1212DA76851790E8BEF8BDFB /* RemoteAnalyticsRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteAnalyticsRepositoryTests.swift; sourceTree = "<group>"; };
 		1D9B63971F10A21D36CB8F86 /* RemoteLeaderboardRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteLeaderboardRepositoryTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -103,6 +105,7 @@
 				F93A17448B435B16CF0C2400 /* RemoteSleepRepositoryTests.swift */,
 				1212DA76851790E8BEF8BDFB /* RemoteAnalyticsRepositoryTests.swift */,
 				1D9B63971F10A21D36CB8F86 /* RemoteLeaderboardRepositoryTests.swift */,
+				E1B2A3C4D5E6F708192A3B4D /* SwiftDataSleepSessionStoreTests.swift */,
 			);
 			path = SnoozeQuestTests;
 			sourceTree = "<group>";
@@ -245,6 +248,7 @@
 				A29D35143E2F16D31E7F9195 /* RemoteSleepRepositoryTests.swift in Sources */,
 				78698D5BE7219CAEEBC26BC1 /* RemoteAnalyticsRepositoryTests.swift in Sources */,
 				5364394ADE624D15E564699D /* RemoteLeaderboardRepositoryTests.swift in Sources */,
+				E1B2A3C4D5E6F708192A3B4C /* SwiftDataSleepSessionStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
