@@ -6,14 +6,22 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @StateObject private var viewModel = SettingsViewModel(healthKitService: AppEnvironment.healthKitService)
     @State private var isShowingOnboarding = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Apple Health") {
-                    LabeledContent("Apple Health", value: "Not Connected")
+                    LabeledContent("Apple Health", value: viewModel.healthKitStatusText)
                     LabeledContent("Last Sync", value: "Never")
+                    if viewModel.healthKitStatus == .notDetermined {
+                        Button("Connect Apple Health") {
+                            Task { await viewModel.connectAppleHealth() }
+                        }
+                    } else if viewModel.healthKitStatus == .denied {
+                        Link("Open Settings", destination: URL(string: UIApplication.openSettingsURLString)!)
+                    }
                     Button("Sync Now") {}
                         .disabled(true)
                 }
