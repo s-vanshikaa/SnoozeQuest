@@ -8,12 +8,6 @@ import Testing
 @testable import SnoozeQuest
 
 struct RemoteSleepRepositoryTests {
-    private static func utcDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) -> Date {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        return calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
-    }
-
     private static let goal = SleepGoal(
         targetDuration: 480 * 60,
         bedtime: TimeOfDay(hour: 23, minute: 0),
@@ -22,7 +16,7 @@ struct RemoteSleepRepositoryTests {
 
     @Test func fetchDailySummariesMapsSessionAndComputesGoalMetScore() async throws {
         let client = FakeAPIClient()
-        let start = Self.utcDate(2026, 1, 1, 23, 0)
+        let start = utcDate(2026, 1, 1, 23, 0)
         let end = start.addingTimeInterval(500 * 60)
         client.stub(path: "/api/v1/sleep", value: [
             SleepSessionDTO(
@@ -49,7 +43,7 @@ struct RemoteSleepRepositoryTests {
 
     @Test func fetchDailySummariesMarksGoalNotMetForShortSession() async throws {
         let client = FakeAPIClient()
-        let start = Self.utcDate(2026, 1, 1, 23, 0)
+        let start = utcDate(2026, 1, 1, 23, 0)
         client.stub(path: "/api/v1/sleep", value: [
             SleepSessionDTO(
                 id: 1, userId: 1, externalId: "x", startTime: start, endTime: start.addingTimeInterval(300 * 60),
