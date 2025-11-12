@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import SwiftData
 
 enum AppEnvironment {
     static let baseURL = URL(string: "http://localhost:8000")!
@@ -23,4 +24,19 @@ enum AppEnvironment {
     )
 
     static let healthKitService: HealthKitServiceProtocol = HealthKitService()
+    static let notificationService: NotificationServiceProtocol = NotificationService()
+
+    static let modelContainer: ModelContainer = try! ModelContainer(for: Schema([SleepSessionRecord.self]))
+    static let sleepSessionStore: SleepSessionStore = SwiftDataSleepSessionStore(
+        context: ModelContext(modelContainer)
+    )
+
+    static let healthKitImportService = HealthKitImportService(
+        healthKitService: healthKitService, sleepSessionStore: sleepSessionStore
+    )
+    static let syncEngine = SyncEngine(apiClient: apiClient, sleepSessionStore: sleepSessionStore, userID: currentUserID)
+
+    static let backgroundRefreshService = BackgroundRefreshService(
+        healthKitImportService: healthKitImportService, syncEngine: syncEngine
+    )
 }

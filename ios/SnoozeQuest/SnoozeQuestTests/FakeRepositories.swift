@@ -56,15 +56,18 @@ final class FakeHealthKitService: HealthKitServiceProtocol {
     var authorizationStatus: HealthKitAuthorizationStatus
     let statusAfterRequest: HealthKitAuthorizationStatus
     let sessionsToReturn: [SleepSession]
+    var errorToThrow: Error?
 
     init(
         authorizationStatus: HealthKitAuthorizationStatus,
         statusAfterRequest: HealthKitAuthorizationStatus,
-        sessionsToReturn: [SleepSession] = []
+        sessionsToReturn: [SleepSession] = [],
+        errorToThrow: Error? = nil
     ) {
         self.authorizationStatus = authorizationStatus
         self.statusAfterRequest = statusAfterRequest
         self.sessionsToReturn = sessionsToReturn
+        self.errorToThrow = errorToThrow
     }
 
     func requestAuthorization() async -> HealthKitAuthorizationStatus {
@@ -73,6 +76,51 @@ final class FakeHealthKitService: HealthKitServiceProtocol {
     }
 
     func fetchRecentSleepSessions(days: Int) async throws -> [SleepSession] {
-        sessionsToReturn
+        if let errorToThrow {
+            throw errorToThrow
+        }
+        return sessionsToReturn
+    }
+}
+
+final class FakeNotificationService: NotificationServiceProtocol {
+    var status: NotificationAuthorizationStatus
+    let statusAfterRequest: NotificationAuthorizationStatus
+    private(set) var scheduledBedtimes: [TimeOfDay] = []
+    private(set) var bedtimeReminderCancelled = false
+    private(set) var weeklySummarySchedCount = 0
+    private(set) var weeklySummaryReminderCancelled = false
+
+    init(
+        status: NotificationAuthorizationStatus = .authorized,
+        statusAfterRequest: NotificationAuthorizationStatus = .authorized
+    ) {
+        self.status = status
+        self.statusAfterRequest = statusAfterRequest
+    }
+
+    func authorizationStatus() async -> NotificationAuthorizationStatus {
+        status
+    }
+
+    func requestAuthorization() async -> NotificationAuthorizationStatus {
+        status = statusAfterRequest
+        return status
+    }
+
+    func scheduleBedtimeReminder(bedtime: TimeOfDay) async throws {
+        scheduledBedtimes.append(bedtime)
+    }
+
+    func cancelBedtimeReminder() async {
+        bedtimeReminderCancelled = true
+    }
+
+    func scheduleWeeklySummaryReminder() async throws {
+        weeklySummarySchedCount += 1
+    }
+
+    func cancelWeeklySummaryReminder() async {
+        weeklySummaryReminderCancelled = true
     }
 }
