@@ -48,8 +48,7 @@ final class RemoteAnalyticsRepository: AnalyticsRepository {
             averageSleepScore: Int(dto.averageSleepScore.rounded()),
             averageDuration: TimeInterval(dto.averageSleepMinutes * 60),
             currentStreak: Self.currentStreak(from: sevenDayTrend),
-            sevenDayTrend: sevenDayTrend,
-            weeklyInsight: ""
+            sevenDayTrend: sevenDayTrend
         )
     }
 

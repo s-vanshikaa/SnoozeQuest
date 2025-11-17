@@ -16,9 +16,13 @@ struct DashboardView: View {
         sleepRepository: AppEnvironment.sleepRepository,
         analyticsRepository: AppEnvironment.analyticsRepository
     )
+    @StateObject private var weeklyInsightViewModel = WeeklyInsightViewModel(
+        weeklyInsightRepository: AppEnvironment.weeklyInsightRepository
+    )
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var contentAppeared = false
     @State private var isShowingJourney = false
+    @State private var isShowingWeeklyInsight = false
 
     private static let weekdayFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -34,16 +38,21 @@ struct DashboardView: View {
                 .task {
                     async let dashboardLoad: Void = viewModel.load()
                     async let journeyLoad: Void = journeyViewModel.load()
-                    _ = await (dashboardLoad, journeyLoad)
+                    async let weeklyInsightLoad: Void = weeklyInsightViewModel.load()
+                    _ = await (dashboardLoad, journeyLoad, weeklyInsightLoad)
                     revealContent()
                 }
                 .refreshable {
                     async let dashboardLoad: Void = viewModel.load()
                     async let journeyLoad: Void = journeyViewModel.load()
-                    _ = await (dashboardLoad, journeyLoad)
+                    async let weeklyInsightLoad: Void = weeklyInsightViewModel.load()
+                    _ = await (dashboardLoad, journeyLoad, weeklyInsightLoad)
                 }
                 .navigationDestination(isPresented: $isShowingJourney) {
                     JourneyView()
+                }
+                .navigationDestination(isPresented: $isShowingWeeklyInsight) {
+                    WeeklyInsightView(state: weeklyInsightViewModel.state)
                 }
         }
     }
@@ -86,7 +95,7 @@ struct DashboardView: View {
                         .appearing(delay: 3, appeared: contentAppeared, reduceMotion: reduceMotion)
                     goalSection(dashboard)
                         .appearing(delay: 4, appeared: contentAppeared, reduceMotion: reduceMotion)
-                    insightSection(dashboard)
+                    insightSection()
                         .appearing(delay: 5, appeared: contentAppeared, reduceMotion: reduceMotion)
                 }
                 .padding(.horizontal, SQSpacing.screenHorizontal)
@@ -227,18 +236,49 @@ struct DashboardView: View {
         }
     }
 
-    private func insightSection(_ dashboard: DashboardDisplayModel) -> some View {
+    private func insightSection() -> some View {
         VStack(alignment: .leading, spacing: SQSpacing.md) {
             SQSectionHeader(title: "Weekly Insight")
 
-            HStack(alignment: .top, spacing: SQSpacing.sm) {
-                Image(systemName: "sparkles")
-                    .foregroundStyle(SQColor.moonlight)
-                Text(dashboard.weeklyInsight)
-                    .font(.subheadline)
-                    .foregroundStyle(SQColor.textSecondary)
+            Button {
+                SQHaptics.selectionChanged()
+                isShowingWeeklyInsight = true
+            } label: {
+                HStack(alignment: .top, spacing: SQSpacing.sm) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(SQColor.moonlight)
+                    Text(weeklyInsightPreviewText)
+                        .font(.subheadline)
+                        .foregroundStyle(SQColor.textSecondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    if isWeeklyInsightTappable {
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(SQColor.textTertiary)
+                    }
+                }
             }
+            .buttonStyle(.plain)
+            .disabled(isWeeklyInsightTappable == false)
         }
+    }
+
+    private var weeklyInsightPreviewText: String {
+        switch weeklyInsightViewModel.state {
+        case .loading:
+            return "Loading this week's insight…"
+        case .available(let insight):
+            return insight.summaryText ?? "Your weekly insight isn't ready yet — check back soon."
+        case .unavailable:
+            return "Weekly insight unavailable right now."
+        }
+    }
+
+    private var isWeeklyInsightTappable: Bool {
+        if case .available = weeklyInsightViewModel.state { return true }
+        return false
     }
 }
 

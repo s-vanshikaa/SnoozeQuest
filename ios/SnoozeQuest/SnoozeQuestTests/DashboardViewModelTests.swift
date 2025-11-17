@@ -23,8 +23,7 @@ struct DashboardViewModelTests {
             averageSleepScore: 80,
             averageDuration: 7.5 * 3600,
             currentStreak: 4,
-            sevenDayTrend: [summary],
-            weeklyInsight: "Great week!"
+            sevenDayTrend: [summary]
         )
 
         let viewModel = DashboardViewModel(
@@ -42,14 +41,13 @@ struct DashboardViewModelTests {
 
         #expect(display.sleepScore == 88)
         #expect(display.goalProgress == 1.0)
-        #expect(display.weeklyInsight == "Great week!")
         #expect(display.sevenDayTrend.count == 1)
         #expect(display.stageBreakdown.count == 4)
     }
 
     @Test func emptyRepositoryProducesEmptyState() async {
         let goal = SleepGoal(targetDuration: 8 * 3600, bedtime: TimeOfDay(hour: 22, minute: 30), wakeTime: TimeOfDay(hour: 6, minute: 30))
-        let analytics = SleepAnalytics(averageSleepScore: 0, averageDuration: 0, currentStreak: 0, sevenDayTrend: [], weeklyInsight: "No data yet.")
+        let analytics = SleepAnalytics(averageSleepScore: 0, averageDuration: 0, currentStreak: 0, sevenDayTrend: [])
 
         let viewModel = DashboardViewModel(
             sleepRepository: FakeSleepRepository(summaries: []),

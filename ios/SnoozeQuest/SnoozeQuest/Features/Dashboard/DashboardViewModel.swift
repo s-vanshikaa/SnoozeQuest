@@ -28,7 +28,6 @@ struct DashboardDisplayModel: Equatable {
     let goalProgressText: String
     let stageBreakdown: [StageBreakdown]
     let sevenDayTrend: [TrendPoint]
-    let weeklyInsight: String
 }
 
 @MainActor
@@ -131,8 +130,7 @@ final class DashboardViewModel: ObservableObject {
             goalProgress: goal.targetDuration > 0 ? min(duration / goal.targetDuration, 1.0) : 0,
             goalProgressText: "\(durationText) of \(targetText) goal",
             stageBreakdown: stageBreakdown,
-            sevenDayTrend: sevenDayTrend,
-            weeklyInsight: analytics.weeklyInsight
+            sevenDayTrend: sevenDayTrend
         )
     }
 

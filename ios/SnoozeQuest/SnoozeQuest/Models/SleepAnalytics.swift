@@ -10,5 +10,4 @@ struct SleepAnalytics: Codable, Equatable {
     var averageDuration: TimeInterval
     var currentStreak: Int
     var sevenDayTrend: [DailySleepSummary]
-    var weeklyInsight: String
 }

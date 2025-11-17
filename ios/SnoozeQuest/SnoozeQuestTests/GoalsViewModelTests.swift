@@ -19,8 +19,7 @@ struct GoalsViewModelTests {
         averageSleepScore: 80,
         averageDuration: 8 * 3600,
         currentStreak: 3,
-        sevenDayTrend: [],
-        weeklyInsight: "Great week!"
+        sevenDayTrend: []
     )
 
     @Test func rejectsZeroDuration() async {

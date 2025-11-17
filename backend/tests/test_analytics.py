@@ -1,40 +1,6 @@
-from datetime import date, datetime, time, timedelta, timezone
-
 from app.services.analytics import calculate_sleep_score
-
-
-def _create_goal(client, user_id, target_minutes=400, target_bedtime="23:00:00"):
-    client.put(
-        "/api/v1/goals/current",
-        json={
-            "user_id": user_id,
-            "target_minutes": target_minutes,
-            "target_bedtime": target_bedtime,
-            "target_wake_time": "07:00:00",
-        },
-    )
-
-
-def _sync_session(client, user_id, external_id, days_ago, deep, rem, core, awake=20):
-    start = datetime.combine(date.today() - timedelta(days=days_ago), time(23, 0), tzinfo=timezone.utc)
-    end = start + timedelta(minutes=deep + rem + core + awake)
-    client.post(
-        "/api/v1/sleep/sync",
-        json={
-            "user_id": user_id,
-            "sessions": [
-                {
-                    "external_id": external_id,
-                    "start_time": start.isoformat(),
-                    "end_time": end.isoformat(),
-                    "deep_minutes": deep,
-                    "rem_minutes": rem,
-                    "core_minutes": core,
-                    "awake_minutes": awake,
-                }
-            ],
-        },
-    )
+from tests.conftest import create_goal as _create_goal
+from tests.conftest import sync_session as _sync_session
 
 
 def test_analytics_requires_existing_goal(client, test_user):
