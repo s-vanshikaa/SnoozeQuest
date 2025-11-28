@@ -15,22 +15,29 @@ final class SettingsViewModel: ObservableObject {
     @Published private(set) var notificationStatus: NotificationAuthorizationStatus = .notDetermined
     @Published var bedtimeReminderEnabled: Bool
     @Published var weeklySummaryReminderEnabled: Bool
+    @Published private(set) var lastSyncDate: Date?
+    @Published private(set) var isSyncing = false
+    @Published private(set) var lastSyncOutcome: SleepSyncOutcome?
 
     private let healthKitService: HealthKitServiceProtocol
     private let notificationService: NotificationServiceProtocol
     private let goalRepository: GoalRepository
+    private let syncCoordinator: SleepSyncCoordinator?
     private let userDefaults: UserDefaults
 
     init(
         healthKitService: HealthKitServiceProtocol = MockHealthKitService(),
         notificationService: NotificationServiceProtocol = MockNotificationService(),
         goalRepository: GoalRepository = MockGoalRepository(),
+        syncCoordinator: SleepSyncCoordinator? = nil,
         userDefaults: UserDefaults = .standard
     ) {
         self.healthKitService = healthKitService
         self.notificationService = notificationService
         self.goalRepository = goalRepository
+        self.syncCoordinator = syncCoordinator
         self.userDefaults = userDefaults
+        self.lastSyncDate = syncCoordinator?.lastSuccessfulSync
         self.healthKitStatus = healthKitService.authorizationStatus
         self.bedtimeReminderEnabled = userDefaults.bool(forKey: Self.bedtimeReminderEnabledKey)
         self.weeklySummaryReminderEnabled = userDefaults.bool(forKey: Self.weeklySummaryReminderEnabledKey)
@@ -43,6 +50,23 @@ final class SettingsViewModel: ObservableObject {
         case .denied: return "Access Denied"
         case .unavailable: return "Not Available"
         }
+    }
+
+    var lastSyncText: String {
+        guard let lastSyncDate else { return "Never" }
+        return lastSyncDate.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    var syncStatusMessage: String? {
+        switch lastSyncOutcome {
+        case .importFailed: return "Couldn't read sleep data from Apple Health."
+        case .syncFailed: return "Some nights couldn't be uploaded. They'll retry on the next sync."
+        case .synced, nil: return nil
+        }
+    }
+
+    var canSyncNow: Bool {
+        healthKitStatus == .authorized && syncCoordinator != nil && !isSyncing
     }
 
     var notificationStatusText: String {
@@ -59,6 +83,19 @@ final class SettingsViewModel: ObservableObject {
 
     func connectAppleHealth() async {
         healthKitStatus = await healthKitService.requestAuthorization()
+        if healthKitStatus == .authorized {
+            await syncNow()
+        }
+    }
+
+    /// Imports the last week from Apple Health and uploads whatever is pending.
+    func syncNow() async {
+        guard let syncCoordinator, !isSyncing else { return }
+        isSyncing = true
+        defer { isSyncing = false }
+
+        lastSyncOutcome = await syncCoordinator.refresh()
+        lastSyncDate = syncCoordinator.lastSuccessfulSync
     }
 
     func requestNotificationAuthorization() async {

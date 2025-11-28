@@ -48,6 +48,14 @@ struct DashboardView: View {
                     async let weeklyInsightLoad: Void = weeklyInsightViewModel.load()
                     _ = await (dashboardLoad, journeyLoad, weeklyInsightLoad)
                 }
+                .onReceive(NotificationCenter.default.publisher(for: .sleepDataDidSync)) { _ in
+                    Task {
+                        async let dashboardLoad: Void = viewModel.load()
+                        async let journeyLoad: Void = journeyViewModel.load()
+                        async let weeklyInsightLoad: Void = weeklyInsightViewModel.load()
+                        _ = await (dashboardLoad, journeyLoad, weeklyInsightLoad)
+                    }
+                }
                 .navigationDestination(isPresented: $isShowingJourney) {
                     JourneyView()
                 }

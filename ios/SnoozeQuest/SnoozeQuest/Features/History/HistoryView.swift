@@ -16,6 +16,9 @@ struct HistoryView: View {
                 .navigationTitle("History")
                 .task(id: viewModel.selectedRange) { await viewModel.load() }
                 .refreshable { await viewModel.load() }
+                .onReceive(NotificationCenter.default.publisher(for: .sleepDataDidSync)) { _ in
+                    Task { await viewModel.load() }
+                }
         }
     }
 

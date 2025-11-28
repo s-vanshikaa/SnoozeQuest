@@ -8,15 +8,12 @@ import Foundation
 
 final class BackgroundRefreshService {
     static let taskIdentifier = "com.vanshika.SnoozeQuest.refresh"
-    private static let importLookbackDays = 7
     private static let minimumInterval: TimeInterval = 4 * 3600
 
-    private let healthKitImportService: HealthKitImportService
-    private let syncEngine: SyncEngine
+    private let coordinator: SleepSyncCoordinator
 
-    init(healthKitImportService: HealthKitImportService, syncEngine: SyncEngine) {
-        self.healthKitImportService = healthKitImportService
-        self.syncEngine = syncEngine
+    init(coordinator: SleepSyncCoordinator) {
+        self.coordinator = coordinator
     }
 
     func register() {
@@ -41,9 +38,7 @@ final class BackgroundRefreshService {
         scheduleNextRefresh()
 
         let work = Task {
-            let success = await Self.performRefresh(
-                healthKitImportService: healthKitImportService, syncEngine: syncEngine
-            )
+            let success = await Self.performRefresh(coordinator: coordinator)
             task.setTaskCompleted(success: success)
         }
         task.expirationHandler = {
@@ -51,13 +46,8 @@ final class BackgroundRefreshService {
         }
     }
 
-    static func performRefresh(healthKitImportService: HealthKitImportService, syncEngine: SyncEngine) async -> Bool {
-        do {
-            try await healthKitImportService.importRecentSleep(days: importLookbackDays)
-            try await syncEngine.sync()
-        } catch {
-            return false
-        }
-        return !Task.isCancelled
+    static func performRefresh(coordinator: SleepSyncCoordinator) async -> Bool {
+        let outcome = await coordinator.refresh()
+        return outcome == .synced && !Task.isCancelled
     }
 }

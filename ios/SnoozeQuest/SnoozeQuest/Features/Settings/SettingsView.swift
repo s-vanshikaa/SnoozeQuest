@@ -9,7 +9,8 @@ struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel(
         healthKitService: AppEnvironment.healthKitService,
         notificationService: AppEnvironment.notificationService,
-        goalRepository: AppEnvironment.goalRepository
+        goalRepository: AppEnvironment.goalRepository,
+        syncCoordinator: AppEnvironment.syncCoordinator
     )
     @State private var isShowingOnboarding = false
 
@@ -18,7 +19,7 @@ struct SettingsView: View {
             Form {
                 Section("Apple Health") {
                     LabeledContent("Apple Health", value: viewModel.healthKitStatusText)
-                    LabeledContent("Last Sync", value: "Never")
+                    LabeledContent("Last Sync", value: viewModel.lastSyncText)
                     if viewModel.healthKitStatus == .notDetermined {
                         Button("Connect Apple Health") {
                             Task { await viewModel.connectAppleHealth() }
@@ -26,8 +27,21 @@ struct SettingsView: View {
                     } else if viewModel.healthKitStatus == .denied {
                         Link("Open Settings", destination: URL(string: UIApplication.openSettingsURLString)!)
                     }
-                    Button("Sync Now") {}
-                        .disabled(true)
+                    Button {
+                        Task { await viewModel.syncNow() }
+                    } label: {
+                        if viewModel.isSyncing {
+                            ProgressView()
+                        } else {
+                            Text("Sync Now")
+                        }
+                    }
+                    .disabled(!viewModel.canSyncNow)
+                    if let message = viewModel.syncStatusMessage {
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(SQColor.warning)
+                    }
                 }
                 .listRowBackground(SQColor.surface)
 

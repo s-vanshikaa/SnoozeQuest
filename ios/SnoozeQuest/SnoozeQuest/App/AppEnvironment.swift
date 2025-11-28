@@ -39,7 +39,9 @@ enum AppEnvironment {
     )
     static let syncEngine = SyncEngine(apiClient: apiClient, sleepSessionStore: sleepSessionStore, userID: currentUserID)
 
-    static let backgroundRefreshService = BackgroundRefreshService(
+    static let syncCoordinator = SleepSyncCoordinator(
         healthKitImportService: healthKitImportService, syncEngine: syncEngine
     )
+
+    static let backgroundRefreshService = BackgroundRefreshService(coordinator: syncCoordinator)
 }

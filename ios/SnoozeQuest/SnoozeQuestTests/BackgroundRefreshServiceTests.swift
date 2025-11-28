@@ -3,12 +3,20 @@
 //  SnoozeQuestTests
 //
 
+import Foundation
 import Testing
 @testable import SnoozeQuest
 
 private struct TestError: Error {}
 
 struct BackgroundRefreshServiceTests {
+    private func makeCoordinator(importer: HealthKitImportService, engine: SyncEngine) -> SleepSyncCoordinator {
+        SleepSyncCoordinator(
+            healthKitImportService: importer, syncEngine: engine,
+            userDefaults: UserDefaults(suiteName: "BackgroundRefreshServiceTests-\(UUID().uuidString)")!
+        )
+    }
+
     @Test func performRefreshReturnsTrueOnSuccessfulImportAndSync() async throws {
         let store = try makeInMemoryStore()
         let importer = HealthKitImportService(
@@ -16,8 +24,9 @@ struct BackgroundRefreshServiceTests {
             sleepSessionStore: store
         )
         let engine = SyncEngine(apiClient: FakeAPIClient(), sleepSessionStore: store, userID: 1)
+        let coordinator = makeCoordinator(importer: importer, engine: engine)
 
-        let result = await BackgroundRefreshService.performRefresh(healthKitImportService: importer, syncEngine: engine)
+        let result = await BackgroundRefreshService.performRefresh(coordinator: coordinator)
 
         #expect(result == true)
     }
@@ -31,8 +40,9 @@ struct BackgroundRefreshServiceTests {
             sleepSessionStore: store
         )
         let engine = SyncEngine(apiClient: FakeAPIClient(), sleepSessionStore: store, userID: 1)
+        let coordinator = makeCoordinator(importer: importer, engine: engine)
 
-        let result = await BackgroundRefreshService.performRefresh(healthKitImportService: importer, syncEngine: engine)
+        let result = await BackgroundRefreshService.performRefresh(coordinator: coordinator)
 
         #expect(result == false)
     }
@@ -44,10 +54,11 @@ struct BackgroundRefreshServiceTests {
             sleepSessionStore: store
         )
         let engine = SyncEngine(apiClient: FakeAPIClient(), sleepSessionStore: store, userID: 1)
+        let coordinator = makeCoordinator(importer: importer, engine: engine)
 
         // Models the expirationHandler firing before the underlying work finishes.
         let task = Task<Bool, Never> {
-            await BackgroundRefreshService.performRefresh(healthKitImportService: importer, syncEngine: engine)
+            await BackgroundRefreshService.performRefresh(coordinator: coordinator)
         }
         task.cancel()
         let result = await task.value

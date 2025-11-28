@@ -5,6 +5,11 @@
 
 import Foundation
 
+struct SyncSummary: Equatable {
+    let synced: Int
+    let failed: Int
+}
+
 final class SyncEngine {
     private let apiClient: APIClientProtocol
     private let sleepSessionStore: SleepSessionStore
@@ -16,14 +21,20 @@ final class SyncEngine {
         self.userID = userID
     }
 
-    func sync() async throws {
+    @discardableResult
+    func sync() async throws -> SyncSummary {
         let pending = try sleepSessionStore.fetchUnsynced()
+        var synced = 0
         for record in pending {
-            await upload(record)
+            if await upload(record) {
+                synced += 1
+            }
         }
+        return SyncSummary(synced: synced, failed: pending.count - synced)
     }
 
-    private func upload(_ record: SleepSessionRecord) async {
+    /// Returns whether the backend accepted the record.
+    private func upload(_ record: SleepSessionRecord) async -> Bool {
         let payload = SleepSyncRequestDTO(
             userId: userID,
             sessions: [SleepSessionUploadDTO(
@@ -50,5 +61,6 @@ final class SyncEngine {
         // If this local write fails, the record stays pending and gets retried next sync —
         // safe because the backend upserts by external_id, so re-uploading is a no-op.
         try? sleepSessionStore.updateSyncState(externalID: record.externalID, to: newState)
+        return newState == .synced
     }
 }

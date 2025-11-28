@@ -13,7 +13,9 @@ struct OnboardingFlowView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(onFinish: @escaping () -> Void) {
-        _viewModel = StateObject(wrappedValue: OnboardingViewModel(onFinish: onFinish))
+        _viewModel = StateObject(wrappedValue: OnboardingViewModel(
+            goalRepository: AppEnvironment.goalRepository, onFinish: onFinish
+        ))
     }
 
     var body: some View {
