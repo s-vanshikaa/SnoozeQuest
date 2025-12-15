@@ -26,7 +26,7 @@ struct OfflineSyncPipelineTests {
         )
         let apiClient = FakeAPIClient()
         apiClient.stub(path: "/api/v1/sleep/sync", value: SleepSyncResponseDTO(synced: 1, sessions: []))
-        let syncEngine = SyncEngine(apiClient: apiClient, sleepSessionStore: store, userID: 1)
+        let syncEngine = SyncEngine(apiClient: apiClient, sleepSessionStore: store, userID: 1, sleep: { _ in })
 
         try await importer.importRecentSleep(days: 7)
         #expect(try store.fetchAll()[0].syncState == .pending)
@@ -54,7 +54,7 @@ struct OfflineSyncPipelineTests {
         )
         let apiClient = FakeAPIClient()
         apiClient.errorToThrow = APIError.serverError(statusCode: 500)
-        let syncEngine = SyncEngine(apiClient: apiClient, sleepSessionStore: store, userID: 1)
+        let syncEngine = SyncEngine(apiClient: apiClient, sleepSessionStore: store, userID: 1, sleep: { _ in })
 
         try await importer.importRecentSleep(days: 7)
         try await syncEngine.sync()

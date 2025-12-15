@@ -25,6 +25,7 @@
 		A3B4C5D6E7F809102A3B4C5F /* HealthKitServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B4C5D6E7F809102A3B4C60 /* HealthKitServiceTests.swift */; };
 		A3B4C5D6E7F809102A3B4C61 /* HealthKitImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B4C5D6E7F809102A3B4C62 /* HealthKitImportServiceTests.swift */; };
 		B4C5D6E7F809102A3B4C5D6E /* SyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C5D6E7F809102A3B4C5D6F /* SyncEngineTests.swift */; };
+		C1A2B3C4D5E6F708192A3B05 /* SyncEngineBatchingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A2B3C4D5E6F708192A3B06 /* SyncEngineBatchingTests.swift */; };
 		C1A2B3C4D5E6F708192A3B03 /* OnboardingViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A2B3C4D5E6F708192A3B04 /* OnboardingViewModelTests.swift */; };
 		C1A2B3C4D5E6F708192A3B01 /* SleepSyncCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A2B3C4D5E6F708192A3B02 /* SleepSyncCoordinatorTests.swift */; };
 		C5D6E7F809102A3B4C5D6E70 /* OfflineSyncPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5D6E7F809102A3B4C5D6E71 /* OfflineSyncPipelineTests.swift */; };
@@ -66,6 +67,7 @@
 		A3B4C5D6E7F809102A3B4C60 /* HealthKitServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthKitServiceTests.swift; sourceTree = "<group>"; };
 		A3B4C5D6E7F809102A3B4C62 /* HealthKitImportServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthKitImportServiceTests.swift; sourceTree = "<group>"; };
 		B4C5D6E7F809102A3B4C5D6F /* SyncEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncEngineTests.swift; sourceTree = "<group>"; };
+		C1A2B3C4D5E6F708192A3B06 /* SyncEngineBatchingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncEngineBatchingTests.swift; sourceTree = "<group>"; };
 		C1A2B3C4D5E6F708192A3B04 /* OnboardingViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingViewModelTests.swift; sourceTree = "<group>"; };
 		C1A2B3C4D5E6F708192A3B02 /* SleepSyncCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SleepSyncCoordinatorTests.swift; sourceTree = "<group>"; };
 		C5D6E7F809102A3B4C5D6E71 /* OfflineSyncPipelineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflineSyncPipelineTests.swift; sourceTree = "<group>"; };
@@ -134,6 +136,7 @@
 				A3B4C5D6E7F809102A3B4C60 /* HealthKitServiceTests.swift */,
 				A3B4C5D6E7F809102A3B4C62 /* HealthKitImportServiceTests.swift */,
 				B4C5D6E7F809102A3B4C5D6F /* SyncEngineTests.swift */,
+				C1A2B3C4D5E6F708192A3B06 /* SyncEngineBatchingTests.swift */,
 				C1A2B3C4D5E6F708192A3B04 /* OnboardingViewModelTests.swift */,
 				C1A2B3C4D5E6F708192A3B02 /* SleepSyncCoordinatorTests.swift */,
 				C5D6E7F809102A3B4C5D6E71 /* OfflineSyncPipelineTests.swift */,
@@ -289,6 +292,7 @@
 				A3B4C5D6E7F809102A3B4C5F /* HealthKitServiceTests.swift in Sources */,
 				A3B4C5D6E7F809102A3B4C61 /* HealthKitImportServiceTests.swift in Sources */,
 				B4C5D6E7F809102A3B4C5D6E /* SyncEngineTests.swift in Sources */,
+				C1A2B3C4D5E6F708192A3B05 /* SyncEngineBatchingTests.swift in Sources */,
 				C1A2B3C4D5E6F708192A3B03 /* OnboardingViewModelTests.swift in Sources */,
 				C1A2B3C4D5E6F708192A3B01 /* SleepSyncCoordinatorTests.swift in Sources */,
 				C5D6E7F809102A3B4C5D6E70 /* OfflineSyncPipelineTests.swift in Sources */,

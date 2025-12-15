@@ -21,7 +21,7 @@ struct SyncEngineTests {
         try Self.seedPendingRecord(in: store, externalID: "healthkit-1")
         let client = FakeAPIClient()
         client.stub(path: "/api/v1/sleep/sync", value: SleepSyncResponseDTO(synced: 1, sessions: []))
-        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1)
+        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1, sleep: { _ in })
 
         try await engine.sync()
 
@@ -34,7 +34,7 @@ struct SyncEngineTests {
         try Self.seedPendingRecord(in: store, externalID: "healthkit-1")
         let client = FakeAPIClient()
         client.errorToThrow = APIError.timeout
-        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1)
+        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1, sleep: { _ in })
 
         try await engine.sync()
 
@@ -42,21 +42,25 @@ struct SyncEngineTests {
         #expect(try store.fetchUnsynced().count == 1)
     }
 
-    @Test func partialFailureLeavesOnlyTheFailingRecordRetryable() async throws {
+    @Test func aFailingBatchLeavesOnlyThatBatchRetryable() async throws {
         let store = try makeInMemoryStore()
-        try Self.seedPendingRecord(in: store, externalID: "healthkit-ok")
-        try Self.seedPendingRecord(in: store, externalID: "healthkit-bad")
+        for index in 0..<(SyncEngine.batchSize + 1) {
+            try Self.seedPendingRecord(in: store, externalID: "healthkit-\(String(format: "%03d", index))")
+        }
         let client = FakeAPIClient()
         client.stub(path: "/api/v1/sleep/sync", value: SleepSyncResponseDTO(synced: 1, sessions: []))
         client.queueError(nil)
-        client.queueError(APIError.serverError(statusCode: 500))
-        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1)
+        for _ in 0..<RetryPolicy.default.maxAttempts {
+            client.queueError(APIError.serverError(statusCode: 500))
+        }
+        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1, sleep: { _ in })
 
-        try await engine.sync()
+        let summary = try await engine.sync()
 
+        #expect(summary == SyncSummary(synced: SyncEngine.batchSize, failed: 1))
         let unsynced = try store.fetchUnsynced()
         #expect(unsynced.count == 1)
-        #expect(unsynced[0].externalID == "healthkit-bad")
+        #expect(unsynced[0].externalID == "healthkit-\(String(format: "%03d", SyncEngine.batchSize))")
     }
 
     @Test func repeatedSyncOfAnAlreadySyncedRecordDoesNotReuploadIt() async throws {
@@ -64,7 +68,7 @@ struct SyncEngineTests {
         try Self.seedPendingRecord(in: store, externalID: "healthkit-1")
         let client = FakeAPIClient()
         client.stub(path: "/api/v1/sleep/sync", value: SleepSyncResponseDTO(synced: 1, sessions: []))
-        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1)
+        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1, sleep: { _ in })
 
         try await engine.sync()
         try await engine.sync()
@@ -77,7 +81,7 @@ struct SyncEngineTests {
         try Self.seedPendingRecord(in: store, externalID: "healthkit-1")
         let client = FakeAPIClient()
         client.errorToThrow = APIError.serverError(statusCode: 500)
-        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1)
+        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1, sleep: { _ in })
 
         try await engine.sync()
 
@@ -88,7 +92,7 @@ struct SyncEngineTests {
     @Test func syncWithNoUnsyncedRecordsMakesNoRequestsAndDoesNotThrow() async throws {
         let store = try makeInMemoryStore()
         let client = FakeAPIClient()
-        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1)
+        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1, sleep: { _ in })
 
         try await engine.sync()
 
@@ -100,7 +104,7 @@ struct SyncEngineTests {
         try Self.seedPendingRecord(in: store, externalID: "healthkit-1")
         let client = FakeAPIClient()
         client.errorToThrow = APIError.timeout
-        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1)
+        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1, sleep: { _ in })
 
         try await engine.sync()
         #expect(try store.fetchAll()[0].syncState == .failed)
@@ -110,7 +114,7 @@ struct SyncEngineTests {
         try await engine.sync()
 
         #expect(try store.fetchAll()[0].syncState == .synced)
-        #expect(client.requestedEndpoints.count == 2)
+        #expect(client.requestedEndpoints.count == RetryPolicy.default.maxAttempts + 1)
     }
 
     @Test func aRecordSavedTwiceLocallyStillSyncsAsOneRecordNotTwo() async throws {
@@ -122,7 +126,7 @@ struct SyncEngineTests {
         try Self.seedPendingRecord(in: store, externalID: "healthkit-1")
         let client = FakeAPIClient()
         client.stub(path: "/api/v1/sleep/sync", value: SleepSyncResponseDTO(synced: 1, sessions: []))
-        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1)
+        let engine = SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1, sleep: { _ in })
 
         try await engine.sync()
 

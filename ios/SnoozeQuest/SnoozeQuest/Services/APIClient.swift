@@ -16,6 +16,11 @@ protocol HTTPTransport {
 extension URLSession: HTTPTransport {}
 
 final class APIClient: APIClientProtocol {
+    private static let connectionFailureCodes: Set<URLError.Code> = [
+        .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost,
+        .cannotFindHost, .dnsLookupFailed, .dataNotAllowed, .internationalRoamingOff,
+    ]
+
     private let baseURL: URL
     private let transport: HTTPTransport
     private let decoder: JSONDecoder
@@ -35,6 +40,8 @@ final class APIClient: APIClientProtocol {
             (data, response) = try await transport.data(for: urlRequest)
         } catch let error as URLError where error.code == .timedOut {
             throw APIError.timeout
+        } catch let error as URLError where Self.connectionFailureCodes.contains(error.code) {
+            throw APIError.connectionFailed
         } catch {
             throw APIError.invalidResponse
         }
@@ -50,6 +57,8 @@ final class APIClient: APIClientProtocol {
             } catch {
                 throw APIError.decodingError
             }
+        case 429:
+            throw APIError.rateLimited
         case 400...499:
             throw APIError.validationError(message: Self.extractErrorMessage(from: data))
         default:

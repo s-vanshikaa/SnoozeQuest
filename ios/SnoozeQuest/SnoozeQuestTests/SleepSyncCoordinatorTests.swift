@@ -48,7 +48,7 @@ struct SleepSyncCoordinatorTests {
         )
         let coordinator = SleepSyncCoordinator(
             healthKitImportService: importer,
-            syncEngine: SyncEngine(apiClient: apiClient, sleepSessionStore: store, userID: 1),
+            syncEngine: SyncEngine(apiClient: apiClient, sleepSessionStore: store, userID: 1, sleep: { _ in }),
             userDefaults: userDefaults,
             notificationCenter: notificationCenter,
             now: { syncedAt }
@@ -68,7 +68,7 @@ struct SleepSyncCoordinatorTests {
         let records = try harness.store.fetchAll()
         #expect(records.count == 2)
         #expect(records.allSatisfy { $0.syncState == .synced })
-        #expect(harness.apiClient.requestedEndpoints.count == 2)
+        #expect(harness.apiClient.requestedEndpoints.count == 1) // both nights go up in one batch
         #expect(harness.coordinator.lastSuccessfulSync == Self.syncedAt)
     }
 
@@ -81,7 +81,7 @@ struct SleepSyncCoordinatorTests {
                 healthKitService: FakeHealthKitService(authorizationStatus: .authorized, statusAfterRequest: .authorized),
                 sleepSessionStore: harness.store
             ),
-            syncEngine: SyncEngine(apiClient: harness.apiClient, sleepSessionStore: harness.store, userID: 1),
+            syncEngine: SyncEngine(apiClient: harness.apiClient, sleepSessionStore: harness.store, userID: 1, sleep: { _ in }),
             userDefaults: harness.userDefaults
         )
 

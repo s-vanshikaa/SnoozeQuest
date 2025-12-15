@@ -118,7 +118,7 @@ struct SettingsViewModelTests {
         )
         let coordinator = SleepSyncCoordinator(
             healthKitImportService: importer,
-            syncEngine: SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1),
+            syncEngine: SyncEngine(apiClient: client, sleepSessionStore: store, userID: 1, sleep: { _ in }),
             userDefaults: defaults
         )
         return (coordinator, store, client, defaults)

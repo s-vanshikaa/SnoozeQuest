@@ -19,6 +19,7 @@ protocol SleepSessionStore {
     func fetchAll() throws -> [SleepSessionRecord]
     func fetchUnsynced() throws -> [SleepSessionRecord]
     func updateSyncState(externalID: String, to state: SyncState) throws
+    func updateSyncState(externalIDs: [String], to state: SyncState) throws
 }
 
 final class SwiftDataSleepSessionStore: SleepSessionStore {
@@ -69,6 +70,18 @@ final class SwiftDataSleepSessionStore: SleepSessionStore {
     func updateSyncState(externalID: String, to state: SyncState) throws {
         guard let record = try fetchRecord(externalID: externalID) else { return }
         record.syncState = state
+        try context.save()
+    }
+
+    /// Updates many records with a single save, instead of one save per record.
+    func updateSyncState(externalIDs: [String], to state: SyncState) throws {
+        guard !externalIDs.isEmpty else { return }
+        let descriptor = FetchDescriptor<SleepSessionRecord>(
+            predicate: #Predicate { externalIDs.contains($0.externalID) }
+        )
+        for record in try context.fetch(descriptor) {
+            record.syncState = state
+        }
         try context.save()
     }
 

@@ -1,38 +1,49 @@
 from datetime import date
 
-from sqlalchemy import func
+from sqlalchemy import Row, func
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models import SleepSession
 from app.schemas.sleep import SleepSessionIn
 
 
-def sync_sessions(db: Session, user_id: int, sessions_in: list[SleepSessionIn]) -> list[SleepSession]:
-    external_ids = [session_in.external_id for session_in in sessions_in]
-    existing = (
-        db.query(SleepSession)
-        .filter(SleepSession.user_id == user_id, SleepSession.external_id.in_(external_ids))
-        .all()
-    )
-    existing_by_external_id = {session.external_id: session for session in existing}
+_UPSERT_COLUMNS = (
+    "start_time",
+    "end_time",
+    "deep_minutes",
+    "rem_minutes",
+    "core_minutes",
+    "awake_minutes",
+)
 
-    sessions = []
-    for session_in in sessions_in:
-        session = existing_by_external_id.get(session_in.external_id)
-        if session is None:
-            session = SleepSession(user_id=user_id, external_id=session_in.external_id)
-            db.add(session)
 
-        session.start_time = session_in.start_time
-        session.end_time = session_in.end_time
-        session.deep_minutes = session_in.deep_minutes
-        session.rem_minutes = session_in.rem_minutes
-        session.core_minutes = session_in.core_minutes
-        session.awake_minutes = session_in.awake_minutes
-        sessions.append(session)
+def sync_sessions(db: Session, user_id: int, sessions_in: list[SleepSessionIn]) -> list[Row]:
+    """Upsert a batch of sessions in one statement, keyed on (user_id, external_id).
 
+    A single INSERT ... ON CONFLICT DO UPDATE is atomic per row, so concurrent or retried
+    requests for the same session can never create duplicates or fail on the unique index.
+    Rows come back in the order the caller first sent them.
+    """
+    # Postgres rejects an upsert that touches the same row twice, so collapse repeats (last wins).
+    latest_by_external_id = {session_in.external_id: session_in for session_in in sessions_in}
+
+    # Inserting in a fixed order makes concurrent batches take row locks in the same order,
+    # which rules out deadlocks between overlapping requests.
+    rows = [
+        {"user_id": user_id, **latest_by_external_id[external_id].model_dump()}
+        for external_id in sorted(latest_by_external_id)
+    ]
+
+    stmt = insert(SleepSession).values(rows)
+    stmt = stmt.on_conflict_do_update(
+        constraint="uq_sleep_sessions_user_external_id",
+        set_={column: stmt.excluded[column] for column in _UPSERT_COLUMNS},
+    ).returning(*SleepSession.__table__.c)
+
+    returned = {row.external_id: row for row in db.execute(stmt)}
     db.commit()
-    return sessions
+    return [returned[external_id] for external_id in latest_by_external_id]
 
 
 def list_sessions(

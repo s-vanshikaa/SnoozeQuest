@@ -123,12 +123,44 @@ struct APIClientTests {
         }
     }
 
-    @Test func otherNetworkFailuresMapToInvalidResponse() async throws {
-        let transport = FakeTransport(result: .failure(URLError(.notConnectedToInternet)))
+    @Test(arguments: [
+        URLError.Code.notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
+    ])
+    func connectivityFailuresMapToConnectionFailed(code: URLError.Code) async throws {
+        let transport = FakeTransport(result: .failure(URLError(code)))
+        let client = makeClient(transport: transport)
+
+        await #expect(throws: APIError.connectionFailed) {
+            let _: Sample = try await client.request(Endpoint(path: "/test"))
+        }
+    }
+
+    @Test func unrecognisedTransportFailuresMapToInvalidResponse() async throws {
+        let transport = FakeTransport(result: .failure(URLError(.badURL)))
         let client = makeClient(transport: transport)
 
         await #expect(throws: APIError.invalidResponse) {
             let _: Sample = try await client.request(Endpoint(path: "/test"))
         }
+    }
+
+    @Test func tooManyRequestsMapsToRateLimited() async throws {
+        let transport = FakeTransport(result: .success((Data(), httpResponse(statusCode: 429))))
+        let client = makeClient(transport: transport)
+
+        await #expect(throws: APIError.rateLimited) {
+            let _: Sample = try await client.request(Endpoint(path: "/test"))
+        }
+    }
+
+    @Test func onlyTransientErrorsAreMarkedRetryable() {
+        #expect(APIError.timeout.isTransient)
+        #expect(APIError.connectionFailed.isTransient)
+        #expect(APIError.rateLimited.isTransient)
+        #expect(APIError.serverError(statusCode: 500).isTransient)
+        #expect(APIError.serverError(statusCode: 503).isTransient)
+        #expect(!APIError.validationError(message: "bad").isTransient)
+        #expect(!APIError.decodingError.isTransient)
+        #expect(!APIError.invalidResponse.isTransient)
     }
 }

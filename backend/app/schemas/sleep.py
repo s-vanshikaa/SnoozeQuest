@@ -19,9 +19,14 @@ class SleepSessionIn(BaseModel):
         return self
 
 
+# Upper bound on one request so a single upload can't be arbitrarily large. Clients batch
+# well below this (the iOS app sends at most 100 per request).
+MAX_SESSIONS_PER_SYNC = 500
+
+
 class SleepSyncRequest(BaseModel):
     user_id: int
-    sessions: list[SleepSessionIn] = Field(min_length=1)
+    sessions: list[SleepSessionIn] = Field(min_length=1, max_length=MAX_SESSIONS_PER_SYNC)
 
 
 class SleepSessionOut(BaseModel):
