@@ -175,27 +175,125 @@ def test_a_transient_failure_is_retried_and_recovers():
     assert client.simulated_backoff_seconds > 0
 
 
-def test_retries_are_bounded_and_the_run_stops_leaving_later_batches_pending():
+EXHAUSTED = ["fail"] * RetryPolicy().max_attempts  # one batch that uses every attempt
+
+
+def test_retries_are_bounded_per_batch():
     server = ScriptedServer(script=["fail"] * 50)
     client = _client(server)
 
-    result = client.sync_pass(_records(250))
+    client.sync_pass(_records(100))
 
     assert len(server.calls) == RetryPolicy().max_attempts
-    assert result.stopped_early
-    assert result.unsynced == 250
-    assert len(client.request_logs) == 1  # the later batches were never attempted
+    assert client.request_logs[0].outcome == "exhausted"
+    assert client.request_logs[0].attempts == RetryPolicy().max_attempts
 
 
-def test_a_later_pass_finishes_what_an_earlier_pass_left_pending():
-    server = ScriptedServer(script=["fail"] * 4)
+def test_one_exhausted_batch_does_not_stop_the_rest_of_the_pass():
+    server = ScriptedServer(script=EXHAUSTED)
     client = _client(server)
-    records = _records(150)
+
+    result = client.sync_pass(_records(300))
+
+    assert result.synced == 200
+    assert result.unsynced == 100
+    assert not result.stopped_early
+    assert len(server.calls) == 4 + 1 + 1
+
+
+def test_two_consecutive_exhausted_batches_still_allow_continuation():
+    server = ScriptedServer(script=EXHAUSTED + EXHAUSTED)
+    client = _client(server)
+
+    result = client.sync_pass(_records(300))
+
+    assert result.synced == 100
+    assert not result.stopped_early
+    assert len(server.calls) == 4 + 4 + 1
+
+
+def test_three_consecutive_exhausted_batches_stop_the_pass_leaving_later_batches_untried():
+    server = ScriptedServer(script=EXHAUSTED * 3)
+    client = _client(server)
+
+    result = client.sync_pass(_records(500))
+
+    assert result.stopped_early
+    assert result.synced == 0
+    assert result.unsynced == 500
+    assert len(server.calls) == 3 * 4
+    assert len(client.request_logs) == 3  # batches 4 and 5 were never attempted
+
+
+def test_three_exhausted_batches_that_are_also_the_last_do_not_count_as_stopping_early():
+    server = ScriptedServer(script=EXHAUSTED * 3)
+
+    result = _client(server).sync_pass(_records(300))
+
+    assert not result.stopped_early
+    assert result.unsynced == 300
+
+
+def test_a_successful_batch_resets_the_consecutive_exhausted_count():
+    # exhausted, exhausted, ok, exhausted, exhausted: never three in a row.
+    server = ScriptedServer(script=EXHAUSTED + EXHAUSTED + ["ok"] + EXHAUSTED + EXHAUSTED)
+    client = _client(server)
+
+    result = client.sync_pass(_records(500))
+
+    assert not result.stopped_early
+    assert len(client.request_logs) == 5
+    assert len(server.calls) == 4 + 4 + 1 + 4 + 4
+    assert result.synced == 100
+
+
+def test_the_consecutive_limit_is_configurable_and_defaults_to_three():
+    assert SyncClient.max_consecutive_exhausted_batches == 3
+    server = ScriptedServer(script=EXHAUSTED)
+    client = SyncClient(post=server.post, batch_size=100, max_consecutive_exhausted_batches=1)
+
+    result = client.sync_pass(_records(300))
+
+    assert result.stopped_early
+    assert len(client.request_logs) == 1
+
+
+def test_exhausted_records_stay_unsynced_and_upload_on_a_later_pass():
+    server = ScriptedServer(script=EXHAUSTED)
+    client = _client(server)
+    records = _records(300)
 
     first = client.sync_pass(records)
     second = client.sync_pass(records)
 
-    assert first.unsynced == 150
+    assert first.unsynced == 100
+    assert second.unsynced == 0
+    assert server.stored == {r["external_id"] for r in records}
+
+
+def test_resending_batches_the_server_already_accepted_keeps_a_single_copy():
+    server = ScriptedServer(script=["lose_response"] * 4)
+    client = _client(server)
+    records = _records(300)
+
+    client.sync_pass(records)
+    assert len(server.stored) == 300
+
+    client.sync_pass(records)
+
+    assert client.synced_ids == {r["external_id"] for r in records}
+    assert len(server.stored) == 300
+
+
+def test_a_later_pass_finishes_what_an_earlier_pass_left_pending():
+    server = ScriptedServer(script=EXHAUSTED * 3)
+    client = _client(server)
+    records = _records(500)
+
+    first = client.sync_pass(records)
+    second = client.sync_pass(records)
+
+    assert first.unsynced == 500
     assert second.unsynced == 0
     assert server.stored == {r["external_id"] for r in records}
 
@@ -274,6 +372,7 @@ def test_the_report_renders_numbers_from_the_results_it_is_given():
             "config": {
                 "records": 4321, "batch_sizes": [1, 100], "repetitions": 2, "seed": 9, "fault_probability": 0.3,
                 "retry_policy": {"max_attempts": 4, "base_delay": 0.5, "max_delay": 8.0},
+                "max_consecutive_exhausted_batches": 3,
                 "command": "python -m benchmarks.run_sync_benchmark",
             },
             "runs": [],

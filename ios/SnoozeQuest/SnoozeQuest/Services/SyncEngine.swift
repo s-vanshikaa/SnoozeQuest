@@ -34,6 +34,11 @@ final class SyncEngine {
     /// small and limits how much a single failed request puts back in the queue.
     static let batchSize = 100
 
+    /// A sync gives up after this many batches in a row each use up all their retries. One
+    /// unlucky batch on a flaky connection shouldn't strand the rest, but a run of them means
+    /// the network is really down and trying further batches would only burn time and battery.
+    static let maxConsecutiveExhaustedBatches = 3
+
     private let apiClient: APIClientProtocol
     private let sleepSessionStore: SleepSessionStore
     private let userID: Int
@@ -59,32 +64,35 @@ final class SyncEngine {
 
     /// Uploads everything not yet synced, `batchSize` records per request.
     ///
-    /// Stops early if a batch still fails after retrying a transient error (the network is
-    /// likely down, so trying the remaining batches would only burn time and battery); records
-    /// not reached stay pending for the next sync.
+    /// A batch that still fails after its retries stays unsynced and the sync moves on to the
+    /// next one. The sync stops once `maxConsecutiveExhaustedBatches` batches in a row have
+    /// done that, or when the task is cancelled; records not reached stay pending for the next
+    /// sync.
     @discardableResult
     func sync() async throws -> SyncSummary {
         let pending = try sleepSessionStore.fetchUnsynced()
-        var synced = 0
+        var state = RunState()
 
         var start = 0
-        while start < pending.count {
+        while start < pending.count && !state.shouldStop {
             let end = min(start + Self.batchSize, pending.count)
-            let batch = Array(pending[start..<end])
-            let result = await upload(batch)
-            synced += result.synced
-            if result.networkUnavailable { break }
+            await upload(Array(pending[start..<end]), state: &state)
             start = end
         }
-        return SyncSummary(synced: synced, failed: pending.count - synced)
+        return SyncSummary(synced: state.synced, failed: pending.count - state.synced)
     }
 
-    private struct BatchResult {
+    private struct RunState {
         var synced = 0
-        var networkUnavailable = false
+        var consecutiveExhaustedBatches = 0
+        var wasCancelled = false
+
+        var shouldStop: Bool {
+            wasCancelled || consecutiveExhaustedBatches >= SyncEngine.maxConsecutiveExhaustedBatches
+        }
     }
 
-    private func upload(_ records: [SleepSessionRecord]) async -> BatchResult {
+    private func upload(_ records: [SleepSessionRecord], state: inout RunState) async {
         // Snapshot before any await so the payload can't change between attempts.
         let uploads = records.map(Self.makeUpload)
         let externalIDs = records.map(\.externalID)
@@ -94,32 +102,37 @@ final class SyncEngine {
             // If this local write fails the records stay pending and are re-sent next sync —
             // safe because the backend upserts by (user_id, external_id).
             try? sleepSessionStore.updateSyncState(externalIDs: externalIDs, to: .synced)
-            return BatchResult(synced: records.count)
+            state.synced += records.count
+            state.consecutiveExhaustedBatches = 0
 
         case .transientFailure:
             try? sleepSessionStore.updateSyncState(externalIDs: externalIDs, to: .failed)
-            return BatchResult(networkUnavailable: true)
+            state.consecutiveExhaustedBatches += 1
+
+        case .cancelled:
+            try? sleepSessionStore.updateSyncState(externalIDs: externalIDs, to: .failed)
+            state.wasCancelled = true
 
         case .permanentFailure:
+            // The server answered, so the network is up: this doesn't count toward giving up.
+            state.consecutiveExhaustedBatches = 0
             // The backend rejects a batch as a whole, so one bad record would otherwise block
             // the rest for good. Split to isolate it; the good records still go through.
             guard records.count > 1 else {
                 try? sleepSessionStore.updateSyncState(externalIDs: externalIDs, to: .failed)
-                return BatchResult()
+                return
             }
             let middle = records.count / 2
-            let first = await upload(Array(records[..<middle]))
-            if first.networkUnavailable { return first }
-            let second = await upload(Array(records[middle...]))
-            return BatchResult(
-                synced: first.synced + second.synced, networkUnavailable: second.networkUnavailable
-            )
+            await upload(Array(records[..<middle]), state: &state)
+            if state.shouldStop { return }
+            await upload(Array(records[middle...]), state: &state)
         }
     }
 
     private enum SendOutcome {
         case success
         case transientFailure
+        case cancelled
         case permanentFailure
     }
 
@@ -143,7 +156,7 @@ final class SyncEngine {
                 do {
                     try await sleep(delay)
                 } catch {
-                    return .transientFailure // cancelled while waiting
+                    return .cancelled // the task was cancelled while waiting to retry
                 }
             } catch {
                 return .permanentFailure

@@ -186,17 +186,133 @@ struct SyncEngineBatchingTests {
         #expect(try harness.store.fetchAll().allSatisfy { $0.syncState == .failed })
     }
 
-    @Test func aBatchThatKeepsFailingStopsTheRunSoLaterBatchesStayPending() async throws {
-        let harness = try Self.makeHarness(recordCount: 250)
-        harness.server.script = Array(repeating: .fail(APIError.timeout), count: 50)
+    // MARK: - Tolerating intermittent failures
+
+    private static var exhaustedBatch: [FakeSyncServer.Behavior] {
+        Array(repeating: .fail(APIError.timeout), count: RetryPolicy.default.maxAttempts)
+    }
+
+    private static func states(_ harness: Harness) throws -> [SyncState] {
+        try harness.store.fetchAll().map(\.syncState)
+    }
+
+    @Test func oneExhaustedBatchDoesNotStopTheRestOfTheSync() async throws {
+        let harness = try Self.makeHarness(recordCount: 300)
+        harness.server.script = Self.exhaustedBatch // batch 1 fails every attempt; the rest succeed
 
         let summary = try await harness.engine.sync()
 
-        #expect(harness.server.requestBatchSizes == Array(repeating: 100, count: RetryPolicy.default.maxAttempts))
-        #expect(summary == SyncSummary(synced: 0, failed: 250))
-        let states = try harness.store.fetchAll().map(\.syncState)
-        #expect(states.filter { $0 == .failed }.count == 100)
-        #expect(states.filter { $0 == .pending }.count == 150)
+        #expect(summary == SyncSummary(synced: 200, failed: 100))
+        #expect(harness.server.requestBatchSizes == [100, 100, 100, 100, 100, 100])
+        let states = try Self.states(harness)
+        #expect(states.prefix(100).allSatisfy { $0 == .failed })
+        #expect(states.suffix(200).allSatisfy { $0 == .synced })
+    }
+
+    @Test func twoConsecutiveExhaustedBatchesStillAllowTheSyncToContinue() async throws {
+        let harness = try Self.makeHarness(recordCount: 300)
+        harness.server.script = Self.exhaustedBatch + Self.exhaustedBatch
+
+        let summary = try await harness.engine.sync()
+
+        #expect(summary == SyncSummary(synced: 100, failed: 200))
+        let expectedRequests: Int = 4 + 4 + 1
+        #expect(harness.server.requestBatchSizes.count == expectedRequests)
+        let states = try Self.states(harness)
+        #expect(states.suffix(100).allSatisfy { $0 == .synced })
+    }
+
+    @Test func threeConsecutiveExhaustedBatchesStopTheSync() async throws {
+        #expect(SyncEngine.maxConsecutiveExhaustedBatches == 3)
+        let harness = try Self.makeHarness(recordCount: 500)
+        harness.server.script = Self.exhaustedBatch + Self.exhaustedBatch + Self.exhaustedBatch
+
+        let summary = try await harness.engine.sync()
+
+        #expect(summary == SyncSummary(synced: 0, failed: 500))
+        // Three batches were attempted, four tries each; batches 4 and 5 were never sent.
+        let expectedBatchSizes: [Int] = Array(repeating: 100, count: 12)
+        #expect(harness.server.requestBatchSizes == expectedBatchSizes)
+        let states = try Self.states(harness)
+        #expect(states.filter { $0 == .failed }.count == 300)
+        #expect(states.filter { $0 == .pending }.count == 200)
+        #expect(harness.server.storedExternalIDs.isEmpty)
+    }
+
+    @Test func aSuccessfulBatchResetsTheConsecutiveExhaustedCount() async throws {
+        let harness = try Self.makeHarness(recordCount: 500)
+        // exhausted, exhausted, ok, exhausted, exhausted: four exhausted batches in total, but
+        // never three in a row, so every batch is attempted.
+        harness.server.script = Self.exhaustedBatch + Self.exhaustedBatch + [.accept]
+            + Self.exhaustedBatch + Self.exhaustedBatch
+
+        let summary = try await harness.engine.sync()
+
+        #expect(summary == SyncSummary(synced: 100, failed: 400))
+        let expectedRequests: Int = 17 // 4 + 4 + 1 + 4 + 4
+        #expect(harness.server.requestBatchSizes.count == expectedRequests)
+        let states = try Self.states(harness)
+        #expect(states.filter { $0 == .synced }.count == 100)
+        #expect(states.filter { $0 == .failed }.count == 400)
+        #expect(states.filter { $0 == .pending }.isEmpty)
+    }
+
+    @Test func exhaustedBatchesStayRetryableAndUploadOnTheNextSync() async throws {
+        let harness = try Self.makeHarness(recordCount: 300)
+        harness.server.script = Self.exhaustedBatch
+
+        try await harness.engine.sync()
+        #expect(try harness.store.fetchUnsynced().count == 100)
+
+        try await harness.engine.sync()
+
+        #expect(try harness.store.fetchUnsynced().isEmpty)
+        #expect(harness.server.storedExternalIDs.count == 300)
+    }
+
+    @Test func resendingBatchesTheServerAlreadyAcceptedNeverDuplicates() async throws {
+        let harness = try Self.makeHarness(recordCount: 300)
+        // Batch 1 is committed on the server four times but every response is lost, so the
+        // client believes it failed and sends it again on the next sync.
+        harness.server.script = Array(
+            repeating: .acceptThenDropResponse(APIError.connectionFailed), count: RetryPolicy.default.maxAttempts
+        )
+
+        try await harness.engine.sync()
+        #expect(try harness.store.fetchUnsynced().count == 100)
+        #expect(harness.server.storedExternalIDs.count == 300)
+
+        try await harness.engine.sync()
+
+        #expect(try harness.store.fetchUnsynced().isEmpty)
+        #expect(harness.server.storedExternalIDs.count == 300) // still 300 unique, not 300 + resends
+        let expectedAccepted: Int = 7 // batch 1 committed 4x (lost responses), batches 2 and 3 once each, batch 1 resent once
+        #expect(harness.server.acceptedRequestCount == expectedAccepted)
+    }
+
+    @Test func cancellationStopsTheSyncImmediatelyInsteadOfMovingToTheNextBatch() async throws {
+        let store = try makeInMemoryStore()
+        let start = utcDate(2026, 1, 1, 23, 0)
+        for index in 0..<300 {
+            try store.save(
+                externalID: "session-\(String(format: "%04d", index))",
+                startDate: start.addingTimeInterval(TimeInterval(index) * 86400),
+                endDate: start.addingTimeInterval(TimeInterval(index) * 86400 + 8 * 3600),
+                deepMinutes: 90, remMinutes: 60, coreMinutes: 300, awakeMinutes: 5
+            )
+        }
+        let server = FakeSyncServer()
+        server.script = Array(repeating: .fail(APIError.timeout), count: 50)
+        let engine = SyncEngine(
+            apiClient: server, sleepSessionStore: store, userID: 1,
+            sleep: { _ in throw CancellationError() }
+        )
+
+        try await engine.sync()
+
+        #expect(server.requestBatchSizes == [100]) // batches 2 and 3 were never attempted
+        let states = try store.fetchAll().map(\.syncState)
+        #expect(states.filter { $0 == .pending }.count == 200)
     }
 
     @Test func backoffDelaysGrowExponentiallyAndStayWithinTheCap() async throws {

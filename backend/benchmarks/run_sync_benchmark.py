@@ -315,6 +315,7 @@ def main(argv: list[str] | None = None) -> None:
             "records": args.records, "batch_sizes": args.batch_sizes, "repetitions": args.repetitions,
             "seed": args.seed, "fault_probability": args.fault_probability,
             "retry_policy": asdict(RetryPolicy()),
+            "max_consecutive_exhausted_batches": SyncClient.max_consecutive_exhausted_batches,
             "command": "python -m benchmarks.run_sync_benchmark " + " ".join(argv if argv is not None else sys.argv[1:]),
         },
         "runs": runs,

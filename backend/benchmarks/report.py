@@ -61,8 +61,9 @@ def _sync_section(sync: dict) -> str:
         "- Sessions are generated deterministically from the seed. Each has a unique `external_id`, so the "
         "number of unique records is exactly the workload size.\n"
         "- A Python model of the iOS `SyncEngine` (`benchmarks/sync_client.py`) uploads them: batches of at "
-        "most `batch_size`, retry with backoff on transient failures, no retry of permanent failures, and "
-        "the run stops after a request exhausts its retries.\n"
+        "most `batch_size`, retry with backoff on transient failures, no retry of permanent failures, a "
+        "batch that exhausts its retries is left unsynced while the run continues, and the run stops after "
+        f"{config['max_consecutive_exhausted_batches']} consecutive batches exhaust their retries.\n"
         "- Each configuration is run "
         f"{config['repetitions']} times on an emptied table; the table reports the **median** of the "
         "repetitions, with the min-max range for total runtime.\n"
@@ -138,7 +139,7 @@ def _sync_section(sync: dict) -> str:
             rel = row["reliability"]
             rows.append([
                 str(row["batch_size"]), _fmt(row["records_synced"]),
-                _fmt(rel["records_unsynced_after_first_pass"]), _fmt(rel["additional_sync_passes"]),
+                _fmt(rel["records_unsynced_after_first_pass"]), _fmt(rel["additional_sync_passes"] + 1),
                 _fmt(rel["final_unsynced_records"]),
                 f"{_fmt(row['total_runtime_seconds']['median'], 2)}",
                 _fmt(row["records_per_second_median"], 0),
@@ -147,7 +148,7 @@ def _sync_section(sync: dict) -> str:
                 "yes" if row["reliability_identical_across_repetitions"] else "NO",
             ])
         parts.append(_table(
-            ["Batch size", "Records synced", "Unsynced after first pass", "Extra passes to finish",
+            ["Batch size", "Records synced", "Unsynced after first pass", "Total sync passes",
              "Unsynced at end", "Runtime s (median)", "Records/s", "Simulated backoff s",
              "p50 ms", "p95 ms", "Reliability numbers identical across repetitions"], rows))
         parts.append("")
@@ -155,8 +156,9 @@ def _sync_section(sync: dict) -> str:
             "**Definitions.** *Initial failed request*: a logical upload whose first attempt failed. "
             "*Recovered*: a record in such a request that was synced by the end of the run (all passes). "
             "*Unrecovered*: one that was not. *Recovery %* = recovered / records in initially failed requests. "
-            "*Unsynced after first pass*: records still pending when the first sync pass ended (a pass stops at "
-            "the first request that exhausts its retries, leaving later batches untouched). *Extra passes*: further "
+            "*Unsynced after first pass*: records still pending when the first sync pass ended (a pass stops after "
+            f"{config['max_consecutive_exhausted_batches']} consecutive batches exhaust their retries, leaving later "
+            "batches untouched). *Total sync passes* = 1 + *extra passes*: further "
             "full sync passes, as the app would run on its next refresh, until nothing is pending. "
             "*Duplicate deliveries absorbed*: records that reached the server more than once (for example a retry "
             "after a lost response) and were applied as no-ops by the upsert."

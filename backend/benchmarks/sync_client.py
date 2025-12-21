@@ -9,11 +9,16 @@ retry behaviour:
   tries with exponential backoff and full jitter, capped at `max_delay`;
 * a permanent failure is never retried as-is; a multi-record batch is split in half to
   isolate the bad record;
-* once a batch is still failing after all its retries, the run stops and the remaining
-  records stay pending until the next pass.
+* a batch that is still failing after all its retries stays unsynced and the run moves on to
+  the next batch; the run stops once `max_consecutive_exhausted_batches` batches in a row have
+  done that, leaving the records not reached pending until the next pass. A batch the server
+  accepts, or rejects with a permanent error (the server answered, so the network is up),
+  resets that count.
 
-Keep the constants in step with `RetryPolicy` and `SyncEngine.batchSize` in
-ios/SnoozeQuest/SnoozeQuest/Services/SyncEngine.swift.
+Keep the constants in step with `RetryPolicy`, `SyncEngine.batchSize` and
+`SyncEngine.maxConsecutiveExhaustedBatches` in
+ios/SnoozeQuest/SnoozeQuest/Services/SyncEngine.swift. Task cancellation, which the Swift
+engine also stops on, has no equivalent here because the benchmark never cancels.
 """
 
 import random
@@ -62,21 +67,25 @@ class SyncClient:
     post: Callable[[list[dict]], None]
     batch_size: int
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
+    max_consecutive_exhausted_batches: int = 3
     jitter: random.Random = field(default_factory=lambda: random.Random(0))
     sleep: Callable[[float], None] = lambda seconds: None
     synced_ids: set[str] = field(default_factory=set)
     request_logs: list[RequestLog] = field(default_factory=list)
     simulated_backoff_seconds: float = 0.0
+    _consecutive_exhausted: int = 0
 
     def sync_pass(self, records: list[dict]) -> PassResult:
         """Uploads every record not yet synced. Mirrors one `SyncEngine.sync()` call."""
         pending = [r for r in records if r["external_id"] not in self.synced_ids]
         synced_before = len(self.synced_ids)
+        self._consecutive_exhausted = 0
 
         stopped_early = False
         for start in range(0, len(pending), self.batch_size):
-            if self._upload(pending[start : start + self.batch_size]) == "exhausted":
-                stopped_early = True
+            self._upload(pending[start : start + self.batch_size])
+            if self._should_stop():
+                stopped_early = start + self.batch_size < len(pending)
                 break
 
         return PassResult(
@@ -85,7 +94,10 @@ class SyncClient:
             stopped_early=stopped_early,
         )
 
-    def _upload(self, batch: list[dict]) -> str:
+    def _should_stop(self) -> bool:
+        return self._consecutive_exhausted >= self.max_consecutive_exhausted_batches
+
+    def _upload(self, batch: list[dict]) -> None:
         log = RequestLog(record_ids=[r["external_id"] for r in batch])
         self.request_logs.append(log)
 
@@ -93,12 +105,17 @@ class SyncClient:
         log.outcome = outcome
         if outcome == "synced":
             self.synced_ids.update(log.record_ids)
-        elif outcome == "rejected" and len(batch) > 1:
-            middle = len(batch) // 2
-            if self._upload(batch[:middle]) == "exhausted":
-                return "exhausted"
-            return self._upload(batch[middle:])
-        return outcome
+            self._consecutive_exhausted = 0
+        elif outcome == "exhausted":
+            self._consecutive_exhausted += 1
+        else:  # rejected: the server answered, so the network is up
+            self._consecutive_exhausted = 0
+            if len(batch) > 1:
+                middle = len(batch) // 2
+                self._upload(batch[:middle])
+                if self._should_stop():
+                    return
+                self._upload(batch[middle:])
 
     def _send_with_retries(self, batch: list[dict], log: RequestLog) -> str:
         for attempt in range(self.retry_policy.max_attempts):
