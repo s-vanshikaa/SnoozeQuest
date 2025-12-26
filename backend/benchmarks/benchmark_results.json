@@ -19,6 +19,26 @@
         "anthropic": "0.122.0"
       },
       "postgres_version": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
+    },
+    "ai_insight_benchmark_environment": {
+      "captured_at_utc": "2026-09-21T23:19:19+00:00",
+      "git_commit": "9f3266e",
+      "git_working_tree_dirty": true,
+      "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "cpu": "Apple M3",
+      "cpu_cores": "8",
+      "memory_gb": 8.0,
+      "python": "3.13.5",
+      "packages": {
+        "fastapi": "0.115.0",
+        "uvicorn": "0.30.6",
+        "sqlalchemy": "2.0.35",
+        "psycopg2-binary": "2.9.12",
+        "httpx": "0.27.2",
+        "pydantic": "2.9.2",
+        "anthropic": "0.122.0"
+      },
+      "postgres_version": "unknown"
     }
   },
   "sync_benchmark": {
@@ -1469,5 +1489,105 @@
         "reliability_identical_across_repetitions": true
       }
     ]
+  },
+  "ai_insight_benchmark": {
+    "config": {
+      "users": 30,
+      "requests_per_week": 100,
+      "stampede_requests": 100,
+      "stampede_workers": 12,
+      "fallback_users": 20,
+      "seed": 42,
+      "week_start": "2026-09-14",
+      "command": "python -m benchmarks.run_ai_insight_benchmark "
+    },
+    "provider": {
+      "mode": "stub",
+      "model": null,
+      "stub_latency_ms": 0.0
+    },
+    "features": {
+      "users_measured": 30,
+      "nights_per_week": 7,
+      "signals_per_night": 7,
+      "signals_per_week_min": 49,
+      "signals_per_week_max": 49,
+      "prompt_characters_mean": 1050.8333333333333
+    },
+    "cache": {
+      "weeks": 30,
+      "requests_per_week": 100,
+      "total_requests": 3000,
+      "provider_calls": 30,
+      "provider_call_latency_ms": {
+        "count": 30,
+        "p50": 0.02402099926257506,
+        "p95": 0.1587185986863916,
+        "mean": 0.09432640047937942,
+        "max": 1.8460409992258064
+      },
+      "cache_hits": 2970,
+      "cache_hit_rate_pct": 99.0,
+      "provider_calls_per_100_requests": 1.0,
+      "provider_call_reduction_pct": 99.0,
+      "cold_request_latency_ms": {
+        "count": 30,
+        "p50": 7.09137499507051,
+        "p95": 11.39291875078925,
+        "mean": 7.744058433551497,
+        "max": 20.089541998459026
+      },
+      "cached_request_latency_ms": {
+        "count": 2970,
+        "p50": 4.10875049783499,
+        "p95": 7.125750149862142,
+        "mean": 4.6272470646108435,
+        "max": 45.12041700218106
+      },
+      "cold_summary_sources": {
+        "ai": 30
+      },
+      "cached_summary_sources": {
+        "ai": 2970
+      },
+      "cached_requests_that_called_the_provider": 0,
+      "tokens": {
+        "calls_with_usage": 0,
+        "input_tokens_mean": null,
+        "output_tokens_mean": null
+      }
+    },
+    "stampede": {
+      "requests": 100,
+      "concurrent_workers": 12,
+      "successful_responses": 100,
+      "failed_responses": 0,
+      "provider_calls": 1,
+      "distinct_summary_texts": 1,
+      "cache_rows_written": 1,
+      "wall_time_seconds": 0.506279541994445,
+      "request_latency_ms": {
+        "count": 100,
+        "p50": 36.96637499888311,
+        "p95": 238.0454628524603,
+        "mean": 59.42820918011421,
+        "max": 266.9791670050472
+      },
+      "injected_provider_delay_ms": 200.0
+    },
+    "fallback": {
+      "requests": 40,
+      "fallback_responses": 40,
+      "ai_responses": 0,
+      "identical_text_on_repeat": true,
+      "provider_calls": 40,
+      "request_latency_ms": {
+        "count": 40,
+        "p50": 5.308313000568887,
+        "p95": 8.820662150174023,
+        "mean": 5.957991649484029,
+        "max": 12.621874993783422
+      }
+    }
   }
 }

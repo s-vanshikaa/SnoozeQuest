@@ -3,7 +3,7 @@ from statistics import mean
 
 from sqlalchemy.orm import Session
 
-from app.models import Goal
+from app.models import Goal, SleepSession
 from app.schemas.weekly_summary import WeeklyMetricsOut
 from app.services.analytics import bedtime_deviation_minutes, score_sessions, session_sleep_minutes
 from app.services.sleep import list_sessions
@@ -14,10 +14,13 @@ def most_recent_completed_week_start(today: date) -> date:
     return current_week_start - timedelta(days=7)
 
 
-def calculate_weekly_metrics(db: Session, user_id: int, goal: Goal, week_start: date) -> WeeklyMetricsOut:
+def load_week_sessions(db: Session, user_id: int, week_start: date) -> list[SleepSession]:
     week_end = week_start + timedelta(days=6)
-    sessions = sorted(list_sessions(db, user_id, week_start, week_end), key=lambda s: s.start_time)
+    return sorted(list_sessions(db, user_id, week_start, week_end), key=lambda s: s.start_time)
 
+
+def metrics_from_sessions(sessions: list[SleepSession], goal: Goal) -> WeeklyMetricsOut:
+    """Weekly aggregates for sessions already sorted by start time."""
     if not sessions:
         return WeeklyMetricsOut(
             average_sleep_minutes=0,
@@ -45,3 +48,7 @@ def calculate_weekly_metrics(db: Session, user_id: int, goal: Goal, week_start: 
         goal_completion_rate=goals_met / len(sessions),
         average_sleep_score=mean(scores),
     )
+
+
+def calculate_weekly_metrics(db: Session, user_id: int, goal: Goal, week_start: date) -> WeeklyMetricsOut:
+    return metrics_from_sessions(load_week_sessions(db, user_id, week_start), goal)

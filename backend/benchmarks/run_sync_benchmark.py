@@ -20,9 +20,8 @@ from pathlib import Path
 from time import perf_counter
 
 import httpx
-import psycopg2
 
-from app.core.config import settings
+from benchmarks.bench_database import BENCH_DB, bench_env, connect as _connect, create_database, drop_database, migrate
 from benchmarks.environment import BACKEND_DIR, collect_environment
 from benchmarks.fault_injection import FaultInjector, InstrumentedTransport
 from benchmarks.report import render_markdown
@@ -30,7 +29,6 @@ from benchmarks.stats import median, percentile
 from benchmarks.sync_client import RetryPolicy, SyncClient
 from benchmarks.synthetic_data import generate_sessions, total_minutes
 
-BENCH_DB = "snoozequest_bench"
 DEFAULT_BATCH_SIZES = (1, 25, 100, 250)
 MAX_EXTRA_PASSES = 1000
 
@@ -49,41 +47,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 # --- database and server lifecycle -------------------------------------------------------
-
-
-def _connect(dbname: str):
-    return psycopg2.connect(
-        host=settings.postgres_host, port=settings.postgres_port,
-        user=settings.postgres_user, password=settings.postgres_password, dbname=dbname,
-    )
-
-
-def create_database() -> None:
-    connection = _connect("postgres")
-    connection.autocommit = True
-    with connection.cursor() as cursor:
-        cursor.execute(f"DROP DATABASE IF EXISTS {BENCH_DB} WITH (FORCE)")
-        cursor.execute(f"CREATE DATABASE {BENCH_DB}")
-    connection.close()
-
-
-def drop_database() -> None:
-    connection = _connect("postgres")
-    connection.autocommit = True
-    with connection.cursor() as cursor:
-        cursor.execute(f"DROP DATABASE IF EXISTS {BENCH_DB} WITH (FORCE)")
-    connection.close()
-
-
-def bench_env() -> dict[str, str]:
-    return {**os.environ, "POSTGRES_DB": BENCH_DB}
-
-
-def migrate() -> None:
-    subprocess.run(
-        [sys.executable, "-m", "alembic", "upgrade", "head"],
-        cwd=BACKEND_DIR, env=bench_env(), check=True, capture_output=True,
-    )
 
 
 def create_user() -> int:

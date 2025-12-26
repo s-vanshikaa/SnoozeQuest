@@ -168,6 +168,137 @@ def _sync_section(sync: dict) -> str:
     return "\n".join(parts)
 
 
+def _latency_row(label: str, summary: dict) -> list[str]:
+    if not summary["count"]:
+        return [label, "0", "n/a", "n/a", "n/a", "n/a"]
+    return [label, _fmt(summary["count"]), _fmt(summary["p50"], 2), _fmt(summary["p95"], 2),
+            _fmt(summary["mean"], 2), _fmt(summary["max"], 2)]
+
+
+def _ai_section(ai: dict) -> str:
+    config, provider, features = ai["config"], ai["provider"], ai["features"]
+    cache, stampede, fallback = ai["cache"], ai["stampede"], ai["fallback"]
+    is_stub = provider["mode"] == "stub"
+
+    parts = ["## Weekly AI insight: features, cache and fallback (Ticket 4)", ""]
+    if is_stub:
+        delay = provider["stub_latency_ms"]
+        parts.append(
+            "> **No real model was called in this run.** The model provider was replaced by a stub "
+            f"(injected delay per call: {_fmt(delay, 0)} ms), because no `ANTHROPIC_API_KEY` was available. "
+            "Provider-call counts, cache hit rates, cached-response latency and fallback behaviour are real "
+            "measurements of this code. **Cold-request latency here is the app's own overhead plus the stub's "
+            "delay; it says nothing about real model latency.** To measure that, run with an API key: "
+            "`ANTHROPIC_API_KEY=... python -m benchmarks.run_ai_insight_benchmark --provider real`."
+        )
+    else:
+        parts.append(f"**Provider:** real Anthropic API, model `{provider['model']}`.")
+    parts.append("")
+
+    parts += ["### Methodology", ""]
+    parts.append(
+        "- The real FastAPI app runs in-process (uvicorn on localhost) against a **throwaway PostgreSQL "
+        "database**; the benchmark process is the HTTP client. A wrapper around the provider counts and times "
+        "every call the app makes to it.\n"
+        f"- {config['users']} users each have a goal and a full synthetic week of nights (seed {config['seed']}, "
+        f"week starting {config['week_start']}). Each user is one distinct (user, week) cache key.\n"
+        f"- **Cold vs cached:** for every key the first request is cold (cache miss); the remaining "
+        f"{config['requests_per_week'] - 1} requests for that same week should be cache hits, giving "
+        f"{config['requests_per_week']} equivalent requests per key. A request counts as a **cache hit** when "
+        "it completed without the provider being called (the per-request provider-call counter did not change).\n"
+        "- **Latency** is client-observed HTTP latency on localhost (the client and server share one Python "
+        "process); p50/p95 use linear interpolation between ranks.\n"
+        f"- **Concurrent burst:** {config['stampede_requests']} simultaneous requests "
+        f"({config['stampede_workers']} workers) for one uncached week.\n"
+        f"- **Fallback:** with the provider failing on every call, {config['fallback_users']} users are each "
+        "requested twice."
+    )
+    parts.append("")
+
+    parts += ["### Structured weekly features sent to the model", ""]
+    parts.append(_table(
+        ["Nights per week", "Signals per night", "Signals per full week", "Prompt characters (mean)"],
+        [[_fmt(features["nights_per_week"]), _fmt(features["signals_per_night"]),
+          f"{_fmt(features['signals_per_week_min'])}"
+          + (f"-{_fmt(features['signals_per_week_max'])}" if features["signals_per_week_max"] != features["signals_per_week_min"] else ""),
+          _fmt(features["prompt_characters_mean"], 0)]]))
+    parts.append("")
+    parts.append(
+        "Signals per night: total sleep, deep, REM, core, awake (minutes), bedtime deviation from the goal "
+        "(minutes) and sleep score, measured from the features the app builds for the benchmark users. Source "
+        "identifiers and raw timestamps are not sent."
+    )
+    parts.append("")
+
+    parts += ["### Cache effectiveness", ""]
+    parts.append(_table(
+        ["Weeks (cache keys)", "Requests / week", "Total requests", "Provider calls", "Cache hits",
+         "Hit rate", "Provider calls per 100 requests", "Provider-call reduction"],
+        [[_fmt(cache["weeks"]), _fmt(cache["requests_per_week"]), _fmt(cache["total_requests"]),
+          _fmt(cache["provider_calls"]), _fmt(cache["cache_hits"]), _fmt(cache["cache_hit_rate_pct"], 2) + "%",
+          _fmt(cache["provider_calls_per_100_requests"], 2), _fmt(cache["provider_call_reduction_pct"], 2) + "%"]]))
+    parts.append("")
+    parts.append(
+        f"Cached requests that still called the provider: {_fmt(cache['cached_requests_that_called_the_provider'])}. "
+        f"Summary sources on cold requests: {cache['cold_summary_sources']}; on cached requests: "
+        f"{cache['cached_summary_sources']}. Reduction = 1 - provider calls / total requests."
+    )
+    parts.append("")
+
+    parts += ["### Latency", ""]
+    latency_rows = [
+        _latency_row("Cold request (cache miss)", cache["cold_request_latency_ms"]),
+        _latency_row("Cached request (cache hit)", cache["cached_request_latency_ms"]),
+    ]
+    if not is_stub:
+        latency_rows.append(_latency_row("Provider call alone", cache["provider_call_latency_ms"]))
+    parts.append(_table(["Request type", "Samples", "p50 ms", "p95 ms", "Mean ms", "Max ms"], latency_rows))
+    parts.append("")
+    cold_p50, cached_p50 = cache["cold_request_latency_ms"]["p50"], cache["cached_request_latency_ms"]["p50"]
+    if cold_p50 and cached_p50:
+        note = (" This compares the app's own cold path (feature build, stub call, cache write) with a cache "
+                "hit; it is not a comparison against real model latency." if is_stub else "")
+        parts.append(f"Median cold request was {_fmt(cold_p50 / cached_p50, 1)}x the median cached request.{note}")
+        parts.append("")
+    if not is_stub and cache["tokens"]["calls_with_usage"]:
+        tokens = cache["tokens"]
+        parts.append(
+            f"Tokens per provider call (mean over {tokens['calls_with_usage']} calls): "
+            f"{_fmt(tokens['input_tokens_mean'], 0)} in, {_fmt(tokens['output_tokens_mean'], 0)} out."
+        )
+        parts.append("")
+
+    parts += ["### Concurrent burst on an uncached week", ""]
+    delay_note = ""
+    if stampede.get("injected_provider_delay_ms"):
+        delay_note = (f" The stub call was held for {_fmt(stampede['injected_provider_delay_ms'], 0)} ms so that "
+                      "requests genuinely overlap; that delay is not a latency claim.")
+    parts.append(_table(
+        ["Requests", "Workers", "Successful", "Failed", "Provider calls", "Distinct summary texts",
+         "Cache rows written", "p50 ms", "p95 ms"],
+        [[_fmt(stampede["requests"]), _fmt(stampede["concurrent_workers"]), _fmt(stampede["successful_responses"]),
+          _fmt(stampede["failed_responses"]), _fmt(stampede["provider_calls"]),
+          _fmt(stampede["distinct_summary_texts"]), _fmt(stampede["cache_rows_written"]),
+          _fmt(stampede["request_latency_ms"]["p50"], 1), _fmt(stampede["request_latency_ms"]["p95"], 1)]]))
+    parts.append("")
+    parts.append("A per-(user, week) database lock makes concurrent requests wait for the first one's result "
+                 "instead of each calling the provider." + delay_note)
+    parts.append("")
+
+    parts += ["### Deterministic fallback when the provider fails", ""]
+    parts.append(_table(
+        ["Requests", "Fallback responses", "AI responses", "Same text on repeat", "Provider calls",
+         "p50 ms", "p95 ms"],
+        [[_fmt(fallback["requests"]), _fmt(fallback["fallback_responses"]), _fmt(fallback["ai_responses"]),
+          "yes" if fallback["identical_text_on_repeat"] else "NO", _fmt(fallback["provider_calls"]),
+          _fmt(fallback["request_latency_ms"]["p50"], 2), _fmt(fallback["request_latency_ms"]["p95"], 2)]]))
+    parts.append("")
+    parts.append("The fallback is not cached, so each request tries the provider again (provider calls equal "
+                 "requests) and the summary returns to AI-written text as soon as the provider recovers.")
+    parts.append("")
+    return "\n".join(parts)
+
+
 def render_markdown(results: dict) -> str:
     parts = [
         "# SnoozeQuest Benchmarks",
@@ -179,8 +310,13 @@ def render_markdown(results: dict) -> str:
     ]
 
     metadata = results.get("metadata", {})
-    if "sync_benchmark_environment" in metadata:
-        parts += ["## Environment", "", _environment_section(metadata["sync_benchmark_environment"]), ""]
+    environment = metadata.get("sync_benchmark_environment") or metadata.get("ai_insight_benchmark_environment")
+    if environment:
+        parts += ["## Environment", "", _environment_section(environment), ""]
+        ai_environment = metadata.get("ai_insight_benchmark_environment")
+        if ai_environment and ai_environment != environment:
+            parts += [f"The AI insight benchmark was run at {ai_environment['captured_at_utc']} UTC on git "
+                      f"{ai_environment['git_commit']}.", ""]
 
     parts += [
         "## Commands",
@@ -192,13 +328,20 @@ def render_markdown(results: dict) -> str:
         "```bash",
         "cd backend",
         "python -m benchmarks.run_sync_benchmark   # writes benchmarks/benchmark_results.json and BENCHMARKS.md",
+        "python -m benchmarks.run_ai_insight_benchmark   # add ANTHROPIC_API_KEY=... --provider real for real model latency",
+        "python -m benchmarks.report                      # re-render BENCHMARKS.md from the JSON",
         "python -m pytest tests/test_benchmark_tooling.py",
         "```",
         "",
     ]
     if "sync_benchmark" in results:
         parts += [f"The sync benchmark in this file was run with: `{results['sync_benchmark']['config']['command']}`", ""]
+    if "ai_insight_benchmark" in results:
+        parts += [f"The AI insight benchmark in this file was run with: `{results['ai_insight_benchmark']['config']['command']}`", ""]
+    if "sync_benchmark" in results:
         parts.append(_sync_section(results["sync_benchmark"]))
+    if "ai_insight_benchmark" in results:
+        parts.append(_ai_section(results["ai_insight_benchmark"]))
 
     parts += [
         "## Limitations",
@@ -212,7 +355,10 @@ def render_markdown(results: dict) -> str:
         "for a real device.\n"
         "- Faults are injected in the client transport, not by breaking the network or the server.\n"
         "- One synthetic user, one uvicorn worker, and one machine; no concurrent-client load.\n"
-        "- Backoff delays are not slept (see Methodology).",
+        "- Backoff delays are not slept (see Methodology).\n"
+        "- AI insight benchmark: the client and the server share one Python process, and the model provider "
+        "may be a stub (the report says which); with a stub, cold latency excludes real model latency. "
+        "Synthetic data only, one week per user, one machine.",
         "",
     ]
     return "\n".join(parts)

@@ -384,3 +384,158 @@ def test_the_report_renders_numbers_from_the_results_it_is_given():
 
     assert "4,321 synthetic sleep sessions" in markdown
     assert "seed 9" in markdown
+
+
+# --- AI insight benchmark tooling --------------------------------------------------------
+
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+from benchmarks.ai_providers import FailingProvider, MeteredClient, StubProvider
+from benchmarks.stats import latency_summary
+
+
+def test_latency_summary_reports_percentiles_and_handles_no_samples():
+    summary = latency_summary([float(v) for v in range(1, 101)])
+
+    assert summary["count"] == 100
+    assert summary["p50"] == pytest.approx(50.5)
+    assert summary["p95"] == pytest.approx(95.05)
+    assert summary["max"] == 100
+    assert latency_summary([])["count"] == 0
+
+
+def _call(client, prompt="hello"):
+    return client.messages.create(model="m", messages=[{"role": "user", "content": prompt}])
+
+
+def test_the_metered_client_counts_and_times_every_call():
+    metered = MeteredClient(StubProvider(latency_ms=20))
+
+    _call(metered)
+    _call(metered)
+
+    assert metered.call_count == 2
+    assert all(record.ok for record in metered.calls)
+    assert all(record.latency_ms >= 19 for record in metered.calls)
+
+
+def test_the_metered_client_records_failures_and_reraises():
+    metered = MeteredClient(FailingProvider())
+
+    with pytest.raises(ConnectionError):
+        _call(metered)
+
+    assert metered.call_count == 1
+    assert metered.calls[0].ok is False
+
+
+def test_the_metered_client_reads_token_usage_when_the_provider_reports_it():
+    from types import SimpleNamespace
+
+    inner = SimpleNamespace(messages=SimpleNamespace(create=lambda **kw: SimpleNamespace(
+        content=[], usage=SimpleNamespace(input_tokens=321, output_tokens=45))))
+    metered = MeteredClient(inner)
+
+    _call(metered)
+
+    assert (metered.calls[0].input_tokens, metered.calls[0].output_tokens) == (321, 45)
+
+
+def test_the_metered_client_can_be_reset_and_repointed_between_phases():
+    metered = MeteredClient(StubProvider())
+    _call(metered)
+
+    metered.reset()
+    metered.inner = FailingProvider()
+
+    assert metered.call_count == 0
+    with pytest.raises(ConnectionError):
+        _call(metered)
+
+
+def test_the_stub_provider_is_deterministic_per_prompt():
+    stub = StubProvider()
+
+    first = _call(stub, "a").content[0].text
+    again = _call(stub, "a").content[0].text
+    other = _call(stub, "b").content[0].text
+
+    assert first == again
+    assert first != other
+
+
+def _ai_results(mode: str) -> dict:
+    latency = {"count": 10, "p50": 5.0, "p95": 9.0, "mean": 6.0, "max": 11.0}
+    return {"ai_insight_benchmark": {
+        "config": {"users": 4, "requests_per_week": 100, "stampede_requests": 50, "stampede_workers": 8,
+                   "fallback_users": 3, "seed": 1, "week_start": "2026-01-05", "command": "cmd"},
+        "provider": {"mode": mode, "model": "claude-opus-5" if mode == "real" else None,
+                     "stub_latency_ms": 0.0 if mode == "stub" else None},
+        "features": {"users_measured": 4, "nights_per_week": 7, "signals_per_night": 7,
+                     "signals_per_week_min": 49, "signals_per_week_max": 49, "prompt_characters_mean": 1000.0},
+        "cache": {"weeks": 4, "requests_per_week": 100, "total_requests": 400, "provider_calls": 4,
+                  "cache_hits": 396, "cache_hit_rate_pct": 99.0, "provider_calls_per_100_requests": 1.0,
+                  "provider_call_reduction_pct": 99.0, "cached_requests_that_called_the_provider": 0,
+                  "cold_summary_sources": {"ai": 4}, "cached_summary_sources": {"ai": 396},
+                  "cold_request_latency_ms": {**latency, "p50": 50.0}, "cached_request_latency_ms": latency,
+                  "provider_call_latency_ms": latency,
+                  "tokens": {"calls_with_usage": 4, "input_tokens_mean": 512.0, "output_tokens_mean": 80.0}},
+        "stampede": {"requests": 50, "concurrent_workers": 8, "successful_responses": 50, "failed_responses": 0,
+                     "provider_calls": 1, "distinct_summary_texts": 1, "cache_rows_written": 1,
+                     "wall_time_seconds": 1.0, "request_latency_ms": latency, "injected_provider_delay_ms": None},
+        "fallback": {"requests": 6, "fallback_responses": 6, "ai_responses": 0, "identical_text_on_repeat": True,
+                     "provider_calls": 6, "request_latency_ms": latency},
+    }}
+
+
+def test_a_stub_run_is_reported_as_not_measuring_real_model_latency():
+    markdown = render_markdown(_ai_results("stub"))
+
+    assert "No real model was called" in markdown
+    assert "says nothing about real model latency" in markdown
+    assert "Provider call alone" not in markdown
+
+
+def test_a_real_run_reports_the_model_and_token_usage():
+    markdown = render_markdown(_ai_results("real"))
+
+    assert "No real model was called" not in markdown
+    assert "`claude-opus-5`" in markdown
+    assert "Provider call alone" in markdown
+    assert "512 in, 80 out" in markdown
+
+
+def test_the_ai_report_shows_the_measured_reduction_and_signal_counts():
+    markdown = render_markdown(_ai_results("stub"))
+
+    assert "99.00%" in markdown
+    assert "| 400 | 4 | 396 |" in markdown
+    assert "| 7 | 7 | 49 |" in markdown
+
+
+def test_the_ai_benchmark_runs_end_to_end_and_the_cache_prevents_provider_calls(tmp_path):
+    backend = Path(__file__).resolve().parent.parent
+    completed = subprocess.run(
+        [sys.executable, "-m", "benchmarks.run_ai_insight_benchmark", "--provider", "stub", "--users", "3",
+         "--requests-per-week", "10", "--stampede-requests", "12", "--fallback-users", "2",
+         "--output-dir", str(tmp_path)],
+        cwd=backend, capture_output=True, text=True, timeout=180,
+    )
+    assert completed.returncode == 0, completed.stderr[-2000:]
+
+    ai = json.loads((tmp_path / "benchmark_results.json").read_text())["ai_insight_benchmark"]
+    assert ai["provider"]["mode"] == "stub"
+    assert ai["features"]["signals_per_week_min"] == 49
+    assert ai["cache"]["total_requests"] == 30
+    assert ai["cache"]["provider_calls"] == 3
+    assert ai["cache"]["cache_hits"] == 27
+    assert ai["cache"]["cached_requests_that_called_the_provider"] == 0
+    assert ai["stampede"]["provider_calls"] == 1
+    assert ai["stampede"]["failed_responses"] == 0
+    assert ai["fallback"]["fallback_responses"] == ai["fallback"]["requests"] == 4
+    assert ai["fallback"]["identical_text_on_repeat"] is True
+    assert "No real model was called" in (tmp_path / "BENCHMARKS.md").read_text()
