@@ -44,12 +44,16 @@ struct SQJourneyCard: View {
                     Spacer(minLength: 0)
                 }
 
-                SQProgressBar(progress: journey.progressToNextWorld, tint: SQColor.moonlight)
+                SQOrbitProgressBar(progress: journey.progressToNextWorld, tint: SQColor.moonlight)
             }
             .padding(SQSpacing.lg)
             .background(
-                RoundedRectangle(cornerRadius: SQRadius.card, style: .continuous)
-                    .fill(SQColor.surfaceDeep)
+                ZStack {
+                    RoundedRectangle(cornerRadius: SQRadius.card, style: .continuous)
+                        .fill(SQColor.surfaceDeep)
+                    SQStarfield(starCount: 14)
+                        .clipShape(RoundedRectangle(cornerRadius: SQRadius.card, style: .continuous))
+                }
             )
         }
         .buttonStyle(.plain)

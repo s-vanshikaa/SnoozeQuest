@@ -107,8 +107,8 @@ struct DashboardView: View {
     }
 
     private func scoreHero(_ dashboard: DashboardDisplayModel) -> some View {
-        VStack(spacing: SQSpacing.md) {
-            SQSleepMoon(
+        VStack(spacing: SQSpacing.lg) {
+            SQCosmicHero(
                 progress: Double(dashboard.sleepScore) / 100,
                 value: "\(dashboard.sleepScore)",
                 label: "Sleep Score",
