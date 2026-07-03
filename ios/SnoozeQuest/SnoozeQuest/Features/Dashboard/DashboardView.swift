@@ -7,8 +7,15 @@ import SwiftUI
 import Charts
 
 struct DashboardView: View {
-    @StateObject private var viewModel = DashboardViewModel()
-    @StateObject private var journeyViewModel = JourneyViewModel()
+    @StateObject private var viewModel = DashboardViewModel(
+        sleepRepository: AppEnvironment.sleepRepository,
+        goalRepository: AppEnvironment.goalRepository,
+        analyticsRepository: AppEnvironment.analyticsRepository
+    )
+    @StateObject private var journeyViewModel = JourneyViewModel(
+        sleepRepository: AppEnvironment.sleepRepository,
+        analyticsRepository: AppEnvironment.analyticsRepository
+    )
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var contentAppeared = false
     @State private var isShowingJourney = false

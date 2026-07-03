@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct LeaderboardView: View {
-    @StateObject private var viewModel = LeaderboardViewModel()
+    @StateObject private var viewModel = LeaderboardViewModel(leaderboardRepository: AppEnvironment.leaderboardRepository)
 
     var body: some View {
         NavigationStack {

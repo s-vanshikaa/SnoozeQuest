@@ -7,7 +7,7 @@ import SwiftUI
 import Charts
 
 struct HistoryView: View {
-    @StateObject private var viewModel = HistoryViewModel()
+    @StateObject private var viewModel = HistoryViewModel(sleepRepository: AppEnvironment.sleepRepository)
 
     var body: some View {
         NavigationStack {
