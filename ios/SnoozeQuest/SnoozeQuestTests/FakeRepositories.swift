@@ -51,3 +51,28 @@ struct FakeLeaderboardRepository: LeaderboardRepository {
         entries
     }
 }
+
+final class FakeHealthKitService: HealthKitServiceProtocol {
+    var authorizationStatus: HealthKitAuthorizationStatus
+    let statusAfterRequest: HealthKitAuthorizationStatus
+    let sessionsToReturn: [SleepSession]
+
+    init(
+        authorizationStatus: HealthKitAuthorizationStatus,
+        statusAfterRequest: HealthKitAuthorizationStatus,
+        sessionsToReturn: [SleepSession] = []
+    ) {
+        self.authorizationStatus = authorizationStatus
+        self.statusAfterRequest = statusAfterRequest
+        self.sessionsToReturn = sessionsToReturn
+    }
+
+    func requestAuthorization() async -> HealthKitAuthorizationStatus {
+        authorizationStatus = statusAfterRequest
+        return authorizationStatus
+    }
+
+    func fetchRecentSleepSessions(days: Int) async throws -> [SleepSession] {
+        sessionsToReturn
+    }
+}
