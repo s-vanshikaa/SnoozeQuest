@@ -9,22 +9,9 @@ import Testing
 @testable import SnoozeQuest
 
 struct SwiftDataSleepSessionStoreTests {
-    private static func utcDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) -> Date {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        return calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
-    }
-
-    private static func makeInMemoryStore() throws -> SwiftDataSleepSessionStore {
-        let schema = Schema([SleepSessionRecord.self])
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [configuration])
-        return SwiftDataSleepSessionStore(context: ModelContext(container))
-    }
-
     @Test func saveInsertsNewRecordAsPending() throws {
-        let store = try Self.makeInMemoryStore()
-        let start = Self.utcDate(2026, 1, 1, 23, 0)
+        let store = try makeInMemoryStore()
+        let start = utcDate(2026, 1, 1, 23, 0)
 
         try store.save(
             externalID: "healthkit-1", startDate: start, endDate: start.addingTimeInterval(8 * 3600),
@@ -38,8 +25,8 @@ struct SwiftDataSleepSessionStoreTests {
     }
 
     @Test func saveWithDuplicateExternalIDUpdatesExistingRecordInstead() throws {
-        let store = try Self.makeInMemoryStore()
-        let start = Self.utcDate(2026, 1, 1, 23, 0)
+        let store = try makeInMemoryStore()
+        let start = utcDate(2026, 1, 1, 23, 0)
 
         try store.save(
             externalID: "healthkit-1", startDate: start, endDate: start.addingTimeInterval(7 * 3600),
@@ -56,8 +43,8 @@ struct SwiftDataSleepSessionStoreTests {
     }
 
     @Test func fetchUnsyncedExcludesSyncedRecords() throws {
-        let store = try Self.makeInMemoryStore()
-        let start = Self.utcDate(2026, 1, 1, 23, 0)
+        let store = try makeInMemoryStore()
+        let start = utcDate(2026, 1, 1, 23, 0)
 
         try store.save(
             externalID: "synced", startDate: start, endDate: start.addingTimeInterval(3600),
@@ -76,8 +63,8 @@ struct SwiftDataSleepSessionStoreTests {
     }
 
     @Test func updateSyncStateTransitionsRecordToFailed() throws {
-        let store = try Self.makeInMemoryStore()
-        let start = Self.utcDate(2026, 1, 1, 23, 0)
+        let store = try makeInMemoryStore()
+        let start = utcDate(2026, 1, 1, 23, 0)
         try store.save(
             externalID: "healthkit-1", startDate: start, endDate: start.addingTimeInterval(3600),
             deepMinutes: 10, remMinutes: 10, coreMinutes: 10, awakeMinutes: 10
@@ -96,7 +83,7 @@ struct SwiftDataSleepSessionStoreTests {
         defer {
             try? FileManager.default.removeItem(at: storeURL)
         }
-        let start = Self.utcDate(2026, 1, 1, 23, 0)
+        let start = utcDate(2026, 1, 1, 23, 0)
 
         let firstContainer = try ModelContainer(
             for: schema, configurations: [ModelConfiguration(schema: schema, url: storeURL)]

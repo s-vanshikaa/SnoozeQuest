@@ -103,6 +103,7 @@ final class APIClient: APIClientProtocol {
     static func makeEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.dateEncodingStrategy = .iso8601
         return encoder
     }
 
