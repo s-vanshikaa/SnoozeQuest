@@ -27,6 +27,8 @@
 		B4C5D6E7F809102A3B4C5D6E /* SyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C5D6E7F809102A3B4C5D6F /* SyncEngineTests.swift */; };
 		C5D6E7F809102A3B4C5D6E70 /* OfflineSyncPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5D6E7F809102A3B4C5D6E71 /* OfflineSyncPipelineTests.swift */; };
 		D6E7F809102A3B4C5D6E7F81 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E7F809102A3B4C5D6E7F82 /* TestSupport.swift */; };
+		E7F809102A3B4C5D6E7F8193 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F809102A3B4C5D6E7F8194 /* NotificationServiceTests.swift */; };
+		F809102A3B4C5D6E7F819305 /* BackgroundRefreshServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F809102A3B4C5D6E7F819306 /* BackgroundRefreshServiceTests.swift */; };
 		A518F8F9A0F574458D8FB374 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB67A9B001FBE62E082C7C3B /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
@@ -62,6 +64,8 @@
 		B4C5D6E7F809102A3B4C5D6F /* SyncEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncEngineTests.swift; sourceTree = "<group>"; };
 		C5D6E7F809102A3B4C5D6E71 /* OfflineSyncPipelineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflineSyncPipelineTests.swift; sourceTree = "<group>"; };
 		D6E7F809102A3B4C5D6E7F82 /* TestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
+		E7F809102A3B4C5D6E7F8194 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
+		F809102A3B4C5D6E7F819306 /* BackgroundRefreshServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackgroundRefreshServiceTests.swift; sourceTree = "<group>"; };
 		1212DA76851790E8BEF8BDFB /* RemoteAnalyticsRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteAnalyticsRepositoryTests.swift; sourceTree = "<group>"; };
 		1D9B63971F10A21D36CB8F86 /* RemoteLeaderboardRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteLeaderboardRepositoryTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -124,6 +128,8 @@
 				B4C5D6E7F809102A3B4C5D6F /* SyncEngineTests.swift */,
 				C5D6E7F809102A3B4C5D6E71 /* OfflineSyncPipelineTests.swift */,
 				D6E7F809102A3B4C5D6E7F82 /* TestSupport.swift */,
+				E7F809102A3B4C5D6E7F8194 /* NotificationServiceTests.swift */,
+				F809102A3B4C5D6E7F819306 /* BackgroundRefreshServiceTests.swift */,
 			);
 			path = SnoozeQuestTests;
 			sourceTree = "<group>";
@@ -273,6 +279,8 @@
 				B4C5D6E7F809102A3B4C5D6E /* SyncEngineTests.swift in Sources */,
 				C5D6E7F809102A3B4C5D6E70 /* OfflineSyncPipelineTests.swift in Sources */,
 				D6E7F809102A3B4C5D6E7F81 /* TestSupport.swift in Sources */,
+				E7F809102A3B4C5D6E7F8193 /* NotificationServiceTests.swift in Sources */,
+				F809102A3B4C5D6E7F819305 /* BackgroundRefreshServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -464,6 +472,7 @@
 				DEVELOPMENT_TEAM = 86XYVVLUCA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "SnoozeQuest reads your sleep data from Apple Health to calculate your sleep score and track your progress.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -498,6 +507,7 @@
 				DEVELOPMENT_TEAM = 86XYVVLUCA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "SnoozeQuest reads your sleep data from Apple Health to calculate your sleep score and track your progress.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
