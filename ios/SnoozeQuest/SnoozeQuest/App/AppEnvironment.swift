@@ -22,6 +22,9 @@ enum AppEnvironment {
     static let leaderboardRepository: LeaderboardRepository = RemoteLeaderboardRepository(
         apiClient: apiClient, currentUserID: currentUserID
     )
+    static let weeklyInsightRepository: WeeklyInsightRepository = RemoteWeeklyInsightRepository(
+        apiClient: apiClient, userID: currentUserID
+    )
 
     static let healthKitService: HealthKitServiceProtocol = HealthKitService()
     static let notificationService: NotificationServiceProtocol = NotificationService()

@@ -9,14 +9,6 @@ final class HealthKitImportService {
     private let healthKitService: HealthKitServiceProtocol
     private let sleepSessionStore: SleepSessionStore
 
-    private static let dayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter
-    }()
-
     init(healthKitService: HealthKitServiceProtocol, sleepSessionStore: SleepSessionStore) {
         self.healthKitService = healthKitService
         self.sleepSessionStore = sleepSessionStore
@@ -26,7 +18,7 @@ final class HealthKitImportService {
         let sessions = try await healthKitService.fetchRecentSleepSessions(days: days)
         for session in sessions {
             try sleepSessionStore.save(
-                externalID: "healthkit-\(Self.dayFormatter.string(from: session.startDate))",
+                externalID: "healthkit-\(UTCDayFormatter.shared.string(from: session.startDate))",
                 startDate: session.startDate,
                 endDate: session.endDate,
                 deepMinutes: minutes(session, .deep),

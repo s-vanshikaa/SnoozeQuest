@@ -52,6 +52,23 @@ struct FakeLeaderboardRepository: LeaderboardRepository {
     }
 }
 
+struct FakeWeeklyInsightRepository: WeeklyInsightRepository {
+    let insight: WeeklyInsight?
+    let errorToThrow: Error?
+
+    init(insight: WeeklyInsight? = nil, errorToThrow: Error? = nil) {
+        self.insight = insight
+        self.errorToThrow = errorToThrow
+    }
+
+    func fetchWeeklyInsight() async throws -> WeeklyInsight {
+        if let errorToThrow {
+            throw errorToThrow
+        }
+        return insight ?? MockSleepData.weeklyInsight
+    }
+}
+
 final class FakeHealthKitService: HealthKitServiceProtocol {
     var authorizationStatus: HealthKitAuthorizationStatus
     let statusAfterRequest: HealthKitAuthorizationStatus

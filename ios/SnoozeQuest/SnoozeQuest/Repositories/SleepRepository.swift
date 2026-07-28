@@ -44,8 +44,8 @@ final class RemoteSleepRepository: SleepRepository {
 
         let endpoint = Endpoint(path: "/api/v1/sleep", queryItems: [
             URLQueryItem(name: "user_id", value: String(userID)),
-            URLQueryItem(name: "start_date", value: Self.dateFormatter.string(from: startDate)),
-            URLQueryItem(name: "end_date", value: Self.dateFormatter.string(from: today)),
+            URLQueryItem(name: "start_date", value: UTCDayFormatter.shared.string(from: startDate)),
+            URLQueryItem(name: "end_date", value: UTCDayFormatter.shared.string(from: today)),
         ])
         let sessions: [SleepSessionDTO] = try await apiClient.request(endpoint)
 
@@ -104,13 +104,5 @@ final class RemoteSleepRepository: SleepRepository {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
         return calendar
-    }()
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter
     }()
 }

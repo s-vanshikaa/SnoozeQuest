@@ -20,6 +20,8 @@ enum MockSleepData {
 
     static let analytics: SleepAnalytics = generateAnalytics(from: dailySummaries)
 
+    static let weeklyInsight: WeeklyInsight = generateWeeklyInsight(from: analytics)
+
     static let leaderboard: [LeaderboardEntry] = generateLeaderboard()
 
     private static func generateDailySummaries(days: Int = 30) -> [DailySleepSummary] {
@@ -89,13 +91,7 @@ enum MockSleepData {
 
     private static func generateAnalytics(from summaries: [DailySleepSummary]) -> SleepAnalytics {
         guard !summaries.isEmpty else {
-            return SleepAnalytics(
-                averageSleepScore: 0,
-                averageDuration: 0,
-                currentStreak: 0,
-                sevenDayTrend: [],
-                weeklyInsight: "No data yet."
-            )
+            return SleepAnalytics(averageSleepScore: 0, averageDuration: 0, currentStreak: 0, sevenDayTrend: [])
         }
 
         let averageScore = summaries.map(\.sleepScore).reduce(0, +) / summaries.count
@@ -112,21 +108,36 @@ enum MockSleepData {
 
         let sevenDayTrend = Array(summaries.suffix(7))
 
-        let insight: String
-        if averageScore >= 80 {
-            insight = "Great week! Your sleep consistency is paying off."
-        } else if averageScore >= 60 {
-            insight = "Decent week. A slightly earlier bedtime could help."
-        } else {
-            insight = "Your sleep took a hit this week — aim for more consistent bedtimes."
-        }
-
         return SleepAnalytics(
             averageSleepScore: averageScore,
             averageDuration: averageDuration,
             currentStreak: streak,
-            sevenDayTrend: sevenDayTrend,
-            weeklyInsight: insight
+            sevenDayTrend: sevenDayTrend
+        )
+    }
+
+    private static func generateWeeklyInsight(from analytics: SleepAnalytics) -> WeeklyInsight {
+        let summaryText: String
+        if analytics.averageSleepScore >= 80 {
+            summaryText = "Great week! Your sleep consistency is paying off."
+        } else if analytics.averageSleepScore >= 60 {
+            summaryText = "Decent week. A slightly earlier bedtime could help."
+        } else {
+            summaryText = "Your sleep took a hit this week — aim for more consistent bedtimes."
+        }
+
+        return WeeklyInsight(
+            weekStartDate: Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date(),
+            metrics: WeeklyInsightMetrics(
+                averageSleepMinutes: analytics.averageDuration / 60,
+                // Fixed, plausible-looking placeholders: computing the real within-week trend
+                // would need the daily summaries split in half, which SleepAnalytics doesn't keep.
+                durationChangeMinutes: 12,
+                bedtimeChangeMinutes: -5,
+                goalCompletionRate: min(Double(analytics.currentStreak) / 7, 1.0),
+                averageSleepScore: Double(analytics.averageSleepScore)
+            ),
+            summaryText: summaryText
         )
     }
 
