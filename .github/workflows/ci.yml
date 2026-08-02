@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      POSTGRES_USER: snoozequest
+      POSTGRES_PASSWORD: snoozequest
+      POSTGRES_DB: snoozequest
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5433
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: snoozequest
+          POSTGRES_PASSWORD: snoozequest
+          POSTGRES_DB: snoozequest
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run database migrations
+        run: alembic upgrade head
+
+      - name: Run tests
+        run: pytest
+
+  ios:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ios/SnoozeQuest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest installed Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Selecting $LATEST_XCODE"
+          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Find an available iPhone simulator
+        id: simulator
+        run: |
+          # A cold CoreSimulator service can make the first xcodebuild -showdestinations call
+          # report zero simulators on a fresh runner; querying simctl first avoids that.
+          xcrun simctl list runtimes > /dev/null
+          xcrun simctl list devices > /dev/null
+          xcodebuild -showdestinations -project SnoozeQuest.xcodeproj -scheme SnoozeQuest 2>&1 | tee /tmp/destinations.txt
+          LINE=$(grep -E 'platform:iOS Simulator.*name:iPhone' /tmp/destinations.txt | tail -1)
+          DEVICE_ID=$(echo "$LINE" | grep -oE 'id:[A-F0-9-]+' | cut -d: -f2)
+          if [ -z "$DEVICE_ID" ]; then
+            echo "::error::No iPhone simulator destination found in the list above."
+            exit 1
+          fi
+          echo "Using simulator: $LINE"
+          echo "id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Build and run unit tests
+        run: |
+          xcodebuild test \
+            -project SnoozeQuest.xcodeproj \
+            -scheme SnoozeQuest \
+            -destination "id=${{ steps.simulator.outputs.id }}"
